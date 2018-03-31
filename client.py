@@ -20,6 +20,7 @@ def send_message(msg, to, port=PORT):
 
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     msg_socket.connect((to, port))
+    msg.sender = msg_socket.getsockname()[0]
     msg_data = io.BytesIO(pickle.dumps(msg))
 
     while True:
