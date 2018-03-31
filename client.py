@@ -1,27 +1,29 @@
+"""File with library to send messages.
+"""
+
+import message
+import pickle
 import socket
 
 BUFFER_SIZE = 1024
+PORT = 5005
 
 
-def send_message(to, port, message_type, content=None, file=None):
-    """
+def send_message(msg, to, port=PORT):
+    """Sends binary/pickle of message object to receiver.
 
-    :param to:
-    :param port:
-    :param message_type:
-    :param content:
-    :param file:
+    :param msg: Message object with data of message to be sent
+    :param to: String with IP address of receiver node
+    :param port: Integer with port to be used for sending/receiving messages.
+        Default is 5005.
     """
 
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     msg_socket.connect((to, port))
-
-
-
-    f = open('TT.png','rb')
+    msg_data = pickle.dump(message)
 
     l = f.read(1024)
-    while (l):
+    while l:
         msg_socket.send(l)
         l = f.read(1024)
     f.close()
