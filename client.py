@@ -1,7 +1,7 @@
 """File with library to send messages.
 """
 
-import message
+import io
 import pickle
 import socket
 
@@ -20,14 +20,13 @@ def send_message(msg, to, port=PORT):
 
     msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     msg_socket.connect((to, port))
-    msg_data = pickle.dump(message)
+    msg_data = io.BytesIO(pickle.dumps(msg))
 
-    l = f.read(1024)
-    while l:
-        msg_socket.send(l)
-        l = f.read(1024)
-    f.close()
+    while True:
+        chunk = msg_data.read(BUFFER_SIZE)
+        if not chunk:
+            break
+        msg_socket.send(chunk)
 
     msg_socket.shutdown(socket.SHUT_WR)
-    print msg_socket.recv(1024)
     msg_socket.close()
