@@ -7,7 +7,9 @@ class Message(object):
 
     Attributes:
           msg_type: String with type of message.
-          content: String with message contents. None by default.
+          content: Data structure/string with message contents.
+                None by default.
+                Dictionary of system resources available for HEARTBEAT messages.
           sender: String with IP address of sender machine.
           file: Byte string with file contents. None by default.
     """
@@ -17,7 +19,7 @@ class Message(object):
 
         Args:
             msg_type: String with type of message.
-            content: String with message contents.
+            content: Data structure/string with message contents.
             file_path: String with absolute path to file to be included.
         """
 
