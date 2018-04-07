@@ -1,7 +1,7 @@
 import select
 import socket
 import sys
-import Queue
+import queue
 
 # Create a TCP/IP socket
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -41,7 +41,7 @@ while inputs:
             inputs.append(connection)
 
             # Give the connection a queue for data we want to send
-            message_queues[connection] = Queue.Queue()
+            message_queues[connection] = queue.Queue()
         else:
             data = s.recv(1024)
             if data:
@@ -65,11 +65,11 @@ while inputs:
                 # Remove message queue
                 del message_queues[s]
 
-        # Handle outputs
+    # Handle outputs
     for s in writable:
         try:
             next_msg = message_queues[s].get_nowait()
-        except Queue.Empty:
+        except queue.Empty:
             # No messages waiting so stop checking for writability.
             print(sys.stderr, 'output queue for', s.getpeername(), 'is empty')
             outputs.remove(s)
