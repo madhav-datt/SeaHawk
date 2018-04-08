@@ -1,5 +1,4 @@
 import argparse
-import serverhandlers
 import pickle
 import select
 import socket
@@ -10,6 +9,12 @@ BUFFER_SIZE = 1048576
 
 compute_nodes = {}
 
+
+def heartbeat_handler(msg):
+
+
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Set up central server.')
@@ -18,14 +23,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--nodes-file',
         required=True,
-        help='Absolute path to txt file with IP addresses of each '
+        help='Absolute path to txt file with IP address, total memory of each '
              'client/computing node.')
     args = parser.parse_args()
 
     with open(args.node_file) as nodes_ip_file:
         for node_ip in nodes_ip_file:
-            compute_nodes[node_ip[:-1]] = {
-                'cpu': None, 'memory': None, 'last_seen': None
+            ip_address, total_memory = node_ip[:-1].split(',')
+            compute_nodes[ip_address] = {
+                'cpu': None, 'memory': None, 'last_seen': None,
+                'total_memory': total_memory,
             }
 
     # Create a TCP/IP socket
@@ -65,7 +72,7 @@ if __name__ == '__main__':
                     msg = pickle.loads(data)
 
                     if msg.msg_type == 'HEARTBEAT':
-                        serverhandlers.heartbeat_handler()
+                        heartbeat_handler(msg)
 
                 else:
                     print(sys.stderr, 'closing', client_address,

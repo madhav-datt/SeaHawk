@@ -43,13 +43,15 @@ def send_message(msg, to, msg_socket=None, port=PORT):
     msg_socket.close()
 
 
-def send_heartbeat(to, port=PORT):
+def send_heartbeat(to, msg_socket=None, port=PORT):
     """Sends heartbeat message with system resource usage information.
 
     Heartbeat message includes current CPU usage percentage and memory available
     for use by new jobs issued at the system.
 
     :param to: String with IP address of receiver node
+    :param msg_socket: Socket object on which message is to be sent. Opens new
+        socket if value is None.
     :param port: Integer with port to be used for sending/receiving messages.
         Default is 5005.
     """
@@ -57,8 +59,8 @@ def send_heartbeat(to, port=PORT):
     # 'cpu': Percent CPU available, 'memory': Available memory in MB
     system_resources = {
         'cpu': 100 - psutil.cpu_percent(),
-        'memory': psutil.virtual_memory().available >> 20
+        'memory': psutil.virtual_memory().available >> 20,
     }
     heartbeat_msg = message.Message(
         msg_type='HEARTBEAT', content=system_resources)
-    send_message(heartbeat_msg, to, port)
+    send_message(msg=heartbeat_msg, to=to, port=port, msg_socket=msg_socket)

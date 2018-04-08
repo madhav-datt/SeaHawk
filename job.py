@@ -9,7 +9,7 @@ class Job:
     """
 
     def __init__(self, name, executable, priority, time_required, min_memory,
-                 min_cores, preference):
+                 min_cores, max_memory):
         """Initializes job object.
 
         :param name: str, name of the job
@@ -19,8 +19,8 @@ class Job:
         :param min_memory: int, min amount of memory (in MB) required for
             execution
         :param min_cores: int, min no. of cores required for execution
-        :param preference: str, preference formula calculation as combination of
-            memory & core.
+        :param max_memory: int, max amount of memory (in MB) preferred for
+            execution
         """
 
         self.name = name
@@ -33,4 +33,11 @@ class Job:
         # Requirements
         self.min_memory = min_memory
         self.min_cores = min_cores
-        self.preference = preference
+        self.max_memory = max_memory
+
+    def get_executable_name(self):
+        """ Return name of the executable file, by parsing the address.
+        """
+
+        executable_address_partitions = self.executable.split('/')
+        return executable_address_partitions[-1]
