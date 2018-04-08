@@ -1,15 +1,19 @@
-# A parser of Job Description File
+"""A parser of Job Description File.
+"""
+
 import argparse
 import os
 from job import Job
 
 
 def parse_jobfile(jobfile_name):
-    """
-    Parse job text file and return key-value pairs
+    """Parse job text file and return key-value pairs.
+
     :param jobfile_name: str, address of the file
     :return: dict, containing key-value pairs of job fields
+    :raises: ValueError: Invalid job description file
     """
+
     job_description_dict = {'name': 'defaultJob',
                             'executable': None,
                             'priority': 0,
@@ -22,14 +26,16 @@ def parse_jobfile(jobfile_name):
         for line in jobfile:
             field, value = [val.strip() for val in line.strip().split(':')]
             if field not in job_description_dict:
-                raise ValueError("Invalid job description file: Field %s not recognized" % field)
+                raise ValueError("Invalid job description file: Field %s not "
+                                 "recognized" % field)
             else:
                 job_description_dict[field] = value
 
     # Check that values for all attributes have been received
     for value in job_description_dict.values():
         if value is None:
-            raise ValueError("Invalid job description file: Missing fields found")
+            raise ValueError(
+                "Invalid job description file: Missing fields found")
 
     # Check that executable exists
     if not os.path.isfile(job_description_dict['executable']):
@@ -39,8 +45,8 @@ def parse_jobfile(jobfile_name):
 
 
 def make_job(jobfile_name):
-    """
-    Make a job object with attributes as given in the jobfile.
+    """Make a job object with attributes as given in the jobfile.
+
     :param jobfile_name: str, address of jobfile
     :return: job object
     """
