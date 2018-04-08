@@ -23,6 +23,8 @@ class Job:
             execution
         """
 
+        self.submission_id = None
+        self.receipt_id = None
         self.name = name
         self.username = os.uname()[1]
         self.executable = executable

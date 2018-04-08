@@ -31,35 +31,3 @@ class Message(object):
         if file_path is not None:
             with open(file_path, 'rb') as file:
                 self.file = file.read()
-
-    @property
-    def msg_type(self):
-        return self.msg_type
-
-    @property
-    def content(self):
-        return self.content
-
-    @property
-    def file(self):
-        return self.file
-
-    @property
-    def sender(self):
-        return self.sender
-
-    @msg_type.setter
-    def msg_type(self, msg_type):
-        self.msg_type = msg_type
-
-    @content.setter
-    def content(self, content):
-        self.content = content
-
-    @file.setter
-    def file(self, file):
-        self.file = file
-
-    @sender.setter
-    def sender(self, sender):
-        self.sender = sender
