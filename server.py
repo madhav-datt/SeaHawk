@@ -3,6 +3,7 @@ import pickle
 import select
 import socket
 import sys
+import time
 
 PORT = 5005
 BUFFER_SIZE = 1048576
@@ -10,9 +11,10 @@ BUFFER_SIZE = 1048576
 compute_nodes = {}
 
 
-def heartbeat_handler(msg):
-
-
+def heartbeat_handler(received_msg):
+    compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
+    compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
+    compute_nodes[received_msg.sender]['last_seen'] = time.time()
 
 
 if __name__ == '__main__':
