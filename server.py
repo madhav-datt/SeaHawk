@@ -9,7 +9,8 @@ import socket
 import sys
 import time
 
-PORT = 5005
+SERVER_SEND_PORT = 5005
+SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
 
 compute_nodes = {}
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     server.setblocking(0)
 
     # Binds the socket to the port
-    server_address = ('', PORT)
+    server_address = ('', SERVER_RECV_PORT)
     print(sys.stderr, 'starting up on %s port %s' % server_address)
     server.bind(server_address)
     server.listen(5)
