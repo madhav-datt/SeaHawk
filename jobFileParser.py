@@ -22,16 +22,18 @@ def parse_jobfile(jobfile_name):
 		for line in jobfile:
 			field, value = [val.strip() for val in line.strip().split(':')]
 			if field not in job_description_dict:
-				raise ValueError("Invalid job description file")
+				raise ValueError("Invalid job description file: Field %s not recognized" % field)
 			else:
 				job_description_dict[field] = value
 
 	# Check that values for all attributes have been received
 	for value in job_description_dict.values():
 		if value is None:
-			raise ValueError("Invalid job description file")
+			raise ValueError("Invalid job description file: Missing fields found")
 
-	# Check that
+	# Check that executable exists
+	if not os.path.isfile(job_description_dict['executable']):
+		raise ValueError('Invalid job description file: Invalid execution path')
 
 	return job_description_dict
 
