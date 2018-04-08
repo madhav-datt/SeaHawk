@@ -25,4 +25,6 @@ if __name__ == '__main__':
         data = connection.recv(BUFFER_SIZE)
         msg = pickle.loads(data)
 
+        # TODO: Process message here
+
         connection.close()

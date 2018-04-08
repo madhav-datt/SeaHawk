@@ -3,6 +3,7 @@
 
 import argparse
 import matchmaking
+import messageutils
 import pickle
 import select
 import socket
@@ -13,6 +14,7 @@ PORT = 5005
 BUFFER_SIZE = 1048576
 
 compute_nodes = {}
+node_list = []
 
 
 def heartbeat_handler(received_msg):
@@ -37,16 +39,17 @@ if __name__ == '__main__':
         for node_ip in nodes_ip_file:
             ip_address, total_memory = node_ip[:-1].split(',')
             matchmaking.running_jobs[ip_address] = []
+            node_list.append(ip_address)
             compute_nodes[ip_address] = {
                 'cpu': None, 'memory': None, 'last_seen': None,
                 'total_memory': total_memory,
             }
 
-    # Create a TCP/IP socket
+    # Creates a TCP/IP socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setblocking(0)
 
-    # Bind the socket to the port
+    # Binds the socket to the port
     server_address = ('', PORT)
     print(sys.stderr, 'starting up on %s port %s' % server_address)
     server.bind(server_address)
@@ -56,6 +59,10 @@ if __name__ == '__main__':
     inputs = [server]
     outputs = []
     client_address = None
+
+    # Sends initial HEARTBEAT message to all client nodes
+    for node_ip in node_list:
+        messageutils.send_heartbeat(to=node_ip, msg_socket=server)
 
     while inputs:
 
