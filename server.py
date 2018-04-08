@@ -3,7 +3,9 @@
 
 import argparse
 import matchmaking
+import messageutils
 import pickle
+import priorityqueue
 import select
 import socket
 import sys
@@ -15,12 +17,31 @@ BUFFER_SIZE = 1048576
 
 compute_nodes = {}
 node_list = []
+job_queue = priorityqueue.JobQueue()
+wait_queue = []
 
 
 def heartbeat_handler(received_msg):
+    """Handler function for HEARTBEAT messages.
+
+    :param received_msg: message, received message.
+    """
+
     compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
     compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
     compute_nodes[received_msg.sender]['last_seen'] = time.time()
+
+    # Send heartbeat message to computing node
+    messageutils.send_heartbeat(to=received_msg.sender, port=SERVER_SEND_PORT)
+
+
+def job_submit_handler(received_msg):
+    """Handler function for JOB_SUBMIT messages.
+
+    :param received_msg: message, received message.
+    """
+
+    pass
 
 
 if __name__ == '__main__':
@@ -83,6 +104,8 @@ if __name__ == '__main__':
 
                     if msg.msg_type == 'HEARTBEAT':
                         heartbeat_handler(msg)
+                    elif msg.msg_type == 'JOB_SUBMIT':
+                        job_submit_handler(msg)
 
                 else:
                     print(sys.stderr, 'closing', client_address,

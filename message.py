@@ -8,8 +8,9 @@ class Message(object):
     Attributes:
           msg_type: String with type of message.
           content: Data structure/string with message contents.
-                None by default.
-                Dictionary of system resources available for HEARTBEAT messages.
+                Default: None.
+                HEARTBEAT: Dictionary of system resources available.
+                JOB_SUBMIT: Job object for the submitted job.
           sender: String with IP address of sender machine.
           file: Byte string with file contents. None by default.
     """
