@@ -1,21 +1,28 @@
-import socket                       # Import socket module
+"""Script to run computing node.
+"""
 
-s = socket.socket()                 # Create a socket object
-host = socket.gethostname()         # Get local machine name
-port = 12345                        # Reserve a port for your service.
-s.bind(('', port))                # Bind to the port
-f = open('recv.png','wb')
-s.listen(1)                         # Now wait for client connection.
-while True:
-    c, addr = s.accept()            # Establish connection with client.
-    print 'Got connection from', addr
-    print "Receiving..."
-    l = c.recv(1024)
-    while (l):
-        print "Receiving..."
-        f.write(l)
-        l = c.recv(1024)
-    f.close()
-    print "Done Receiving"
-    c.send('Thank you for connecting')
-    c.close()                       # Close the connection
+import argparse
+import socket
+import pickle
+
+PORT = 5005
+BUFFER_SIZE = 1048576
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Set up computing node.')
+    parser.add_argument(
+        '--ip', required=True, help='IP address of central server.')
+    args = parser.parse_args()
+
+    msg_socket = socket.socket()
+    msg_socket.bind(('', PORT))
+    msg_socket.listen(1)
+
+    while True:
+        connection, client_address = msg_socket.accept()
+        data = connection.recv(BUFFER_SIZE)
+        msg = pickle.loads(data)
+
+        connection.close()

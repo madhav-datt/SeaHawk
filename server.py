@@ -1,4 +1,8 @@
+"""Script to run central server.
+"""
+
 import argparse
+import matchmaking
 import pickle
 import select
 import socket
@@ -32,6 +36,7 @@ if __name__ == '__main__':
     with open(args.node_file) as nodes_ip_file:
         for node_ip in nodes_ip_file:
             ip_address, total_memory = node_ip[:-1].split(',')
+            matchmaking.running_jobs[ip_address] = []
             compute_nodes[ip_address] = {
                 'cpu': None, 'memory': None, 'last_seen': None,
                 'total_memory': total_memory,
@@ -42,7 +47,7 @@ if __name__ == '__main__':
     server.setblocking(0)
 
     # Bind the socket to the port
-    server_address = (args.ip, PORT)
+    server_address = ('', PORT)
     print(sys.stderr, 'starting up on %s port %s' % server_address)
     server.bind(server_address)
     server.listen(5)
