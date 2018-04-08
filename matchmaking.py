@@ -47,6 +47,7 @@ def matchmaking(job, compute_nodes):
                 if memory_diff < diff_from_max:
                     diff_from_max = memory_diff
                     best_candidate = idle_machine
+            running_jobs[best_candidate].append(job)
             return best_candidate, None
 
         else:
@@ -56,6 +57,7 @@ def matchmaking(job, compute_nodes):
                 if compute_nodes[idle_machine]['cpu'] < min_cpu_usage:
                     min_cpu_usage = compute_nodes[idle_machine]['cpu']
                     best_candidate = idle_machine
+            running_jobs[best_candidate].append(job)
             return best_candidate, None
 
     else:
@@ -79,4 +81,6 @@ def matchmaking(job, compute_nodes):
                     job_to_preempt = lowest_priority_job
                     best_candidate = node_id
 
+        if best_candidate is not None:
+            running_jobs[best_candidate].append(job)
         return best_candidate, job_to_preempt
