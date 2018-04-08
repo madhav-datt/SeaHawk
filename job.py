@@ -40,4 +40,4 @@ class Job:
         """
 
         executable_address_partitions = self.executable.split('/')
-        return executable_address_partitions[-1]
+        return '/' + executable_address_partitions[-1]
