@@ -82,10 +82,12 @@ def main():
     # begin argument parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("-serverip", help="IP address of central server", type=str)
+    parser.add_argument("-backupip", help="IP address of backup server", type=str)
     args = vars(parser.parse_args())
 
-    # obtain server's ip and port from the arguments
+    # obtain server and backup ip's from the arguments
     server_ip = args['serverip']
+    backup_ip = args['backupip']
 
     # new stdin descriptor for child process
     newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
