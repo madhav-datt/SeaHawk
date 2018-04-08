@@ -18,4 +18,4 @@ class Job:
 		# Requirements
 		self.min_memory = min_memory
 		self.min_cores = min_cores
-		self.max_memory = p
+		self.max_memory = max_memory
