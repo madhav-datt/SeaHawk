@@ -11,17 +11,25 @@ BUFFER_SIZE = 1024
 PORT = 5005
 
 
-def send_message(msg, to, port=PORT):
+def send_message(msg, to, msg_socket=None, port=PORT):
     """Sends binary/pickle of message object to receiver.
 
     :param msg: Message object with data of message to be sent
     :param to: String with IP address of receiver node
+    :param msg_socket: Socket object on which message is to be sent. Opens new
+        socket if value is None.
     :param port: Integer with port to be used for sending/receiving messages.
         Default is 5005.
     """
 
-    msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    msg_socket.connect((to, port))
+    if msg_socket is None:
+        msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        try:
+            msg_socket.connect((to, port))
+        except OSError:
+            # Raised if endpoint is already connected. No action is needed.
+            pass
     msg.sender = msg_socket.getsockname()[0]
     msg_data = io.BytesIO(pickle.dumps(msg))
 
