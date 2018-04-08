@@ -1,4 +1,4 @@
-"""File which does the matchmaking of jobs
+"""File which does the matchmaking of jobs.
 """
 
 # compute_nodes: stores cpu usage and memory of each node {nodeId: status}
@@ -8,18 +8,18 @@ running_jobs = {}
 
 
 def matchmaking(job, compute_nodes):
-    """
+    """Matchmaking algorithm to pick best compute node for a job.
+
+    First find candidate machines (min requirement of memory and CPU).
+    If a candidate is idle, order by max memory.
+    If no idle candidate, order by CPU usage.
+    If CPU usage of all candidates > 80%, need to preempt.
 
     :param job: The job to be scheduled
     :param compute_nodes:
     :return: (node, job). The node where this job has to be scheduled, and also
         the job that is to be preempted (if any)
     """
-
-    # First find candidate machines (min requirement of memory and CPU)
-    # If a candidate is idle, order by max memory
-    # If no idle candidate, order by CPU usage
-    # If CPU usage of all candidates > 80%, need to preempt
 
     candidates = []
     best_candidate = None
