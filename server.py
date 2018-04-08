@@ -44,8 +44,7 @@ def job_submit_handler(received_msg):
     pass
 
 
-if __name__ == '__main__':
-
+def main():
     parser = argparse.ArgumentParser(description='Set up central server.')
     parser.add_argument(
         '--ip', required=True, help='IP address of central server (this node).')
@@ -112,3 +111,7 @@ if __name__ == '__main__':
                           'after reading no data')
                     inputs.remove(msg_socket)
                     msg_socket.close()
+
+
+if __name__ == '__main__':
+    main()

@@ -90,7 +90,7 @@ def submission_interface(newstdin, job_array):
 
 
 def heartbeat_handler(job_array, submitted_jobs, server_ip):
-    """ Scan job_array for jobs queued up for submission, send to server.
+    """Scan job_array for jobs queued up for submission, send to server.
 
     :param job_array: shared mp.array
     :param submitted_jobs: set, containing submitted job ids
@@ -130,7 +130,7 @@ def heartbeat_handler(job_array, submitted_jobs, server_ip):
 
 
 def ack_job_submit_handler(msg, acknowledged_jobs):
-    """
+    """Add job to acknowledged job set
 
     :param msg: message, received message
     :param acknowledged_jobs: set, containing acknowledged job ids
