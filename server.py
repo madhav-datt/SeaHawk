@@ -3,7 +3,6 @@
 
 import argparse
 import matchmaking
-import messageutils
 import pickle
 import select
 import socket
@@ -59,10 +58,6 @@ if __name__ == '__main__':
     inputs = [server]
     outputs = []
     client_address = None
-
-    # Sends initial HEARTBEAT message to all client nodes
-    for node_ip in node_list:
-        messageutils.send_heartbeat(to=node_ip, msg_socket=server)
 
     while inputs:
 
