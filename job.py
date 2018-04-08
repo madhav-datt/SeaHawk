@@ -1,5 +1,4 @@
-"""File with class for job objects.
-"""
+"""File with class for job objects."""
 
 import os
 

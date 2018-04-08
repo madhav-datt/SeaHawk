@@ -1,5 +1,4 @@
-"""A parser of Job Description File.
-"""
+"""A parser of Job Description File. """
 
 import argparse
 import os
@@ -50,6 +49,7 @@ def make_job(jobfile_name):
     :param jobfile_name: str, address of jobfile
     :return: job object
     """
+
     job_description_dict = parse_jobfile(jobfile_name)
     job = Job(**job_description_dict)
     return job

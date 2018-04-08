@@ -1,16 +1,16 @@
 import socket
 import sys
 
-messages = [ 'This is the message. ',
-             'It will be sent ',
-             'in parts.',
-             ]
+messages = ['This is the message. ',
+            'It will be sent ',
+            'in parts.',
+            ]
 server_address = ('localhost', 10000)
 
 # Create a TCP/IP socket
-socks = [ socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-          socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-          ]
+socks = [socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+         socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+         ]
 
 # Connect the socket to the port where the server is listening
 print(sys.stderr, 'connecting to %s port %s' % server_address)
@@ -22,7 +22,7 @@ for message in messages:
     # Send messages on both sockets
     for s in socks:
         print(sys.stderr, '%s: sending "%s"' % (s.getsockname(), message))
-        s.send(bytes(message,'UTF-8'))
+        s.send(bytes(message, 'UTF-8'))
 
     # Read responses on both sockets
     for s in socks:

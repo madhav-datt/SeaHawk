@@ -21,8 +21,10 @@ BUFFER_SIZE = 1048576
 
 
 def submission_interface(newstdin, job_array):
-    """
-    Handle job submission interface.
+    """Handle job submission interface.
+
+    Child process forked from main, with shared data array.
+
     :param newstdin: stdin file descriptor given by parent
     :param job_array: shared boolean array, for signalling submitted jobs to
         parent
@@ -31,7 +33,7 @@ def submission_interface(newstdin, job_array):
 
     sys.stdin = newstdin
     project_name = 'SeaHawk'
-    print('Welcome to %s\n' % project_name)
+    print('*** Welcome to %s ***\n' % project_name)
 
     # Keep track of all created jobs, also used to index directory names - which
     # store job files
