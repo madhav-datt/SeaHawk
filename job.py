@@ -14,7 +14,7 @@ class Job:
         :param name: str, name of the job
         :param executable: str, address of the executable file
         :param priority:  int, -20 to 20 denoting priority
-        :param time_required: int, seconds of time required
+        :param time_required: float, seconds of time required
         :param min_memory: int, min amount of memory (in MB) required for
             execution
         :param min_cores: int, min no. of cores required for execution

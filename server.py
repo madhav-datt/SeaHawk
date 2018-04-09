@@ -45,6 +45,7 @@ def job_submit_handler(received_msg):
 
 
 def main():
+
     parser = argparse.ArgumentParser(description='Set up central server.')
     parser.add_argument(
         '--ip', required=True, help='IP address of central server (this node).')

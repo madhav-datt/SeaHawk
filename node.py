@@ -1,11 +1,13 @@
 """ Job submission handler, responsible for communication with central server,
     and job submitter.
 """
-
 import sys
 import argparse
 import pickle
 import socket
+import subprocess
+import time
+import signal
 import os.path
 import multiprocessing as mp
 from shutil import copyfile
@@ -18,6 +20,7 @@ import message
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
 BUFFER_SIZE = 1048576
+JOB_EXECUTION_TIME_QUANTA = 1
 
 
 def submission_interface(newstdin, job_array):
@@ -29,8 +32,8 @@ def submission_interface(newstdin, job_array):
     :param job_array: shared boolean array, for signalling submitted jobs to
         parent
     :return: None
-    """
 
+    """
     sys.stdin = newstdin
     project_name = 'SeaHawk'
     print('*** Welcome to %s ***\n' % project_name)
@@ -89,15 +92,15 @@ def submission_interface(newstdin, job_array):
             # Continue looping: return to blocking for user input
 
 
-def heartbeat_handler(job_array, submitted_jobs, server_ip):
+def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
     """Scan job_array for jobs queued up for submission, send to server.
 
     :param job_array: shared mp.array
     :param submitted_jobs: set, containing submitted job ids
     :param server_ip: str, ip address of server
     :return: None
-    """
 
+    """
     for itr in range(len(job_array)):
 
         if job_array[itr] and itr not in submitted_jobs:
@@ -129,15 +132,111 @@ def heartbeat_handler(job_array, submitted_jobs, server_ip):
             messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
 
 
-def ack_job_submit_handler(msg, acknowledged_jobs):
+def ack_job_submit_msg_handler(msg, acknowledged_jobs):
     """Add job to acknowledged job set
 
     :param msg: message, received message
     :param acknowledged_jobs: set, containing acknowledged job ids
     :return: None
+
     """
     ack_job_id = msg.submission_id
     acknowledged_jobs.add(ack_job_id)
+
+
+def execute_job(current_job, execution_dst, server_ip):
+    """Execute the executable file, and send submission results to server_ip
+
+    :param current_job: job object, to be executed
+    :param execution_dst: str, path to executable file
+    :param server_ip: str, ip address of server
+    :return: None
+
+    """
+    # Record start time for job
+    start_time = time.time()
+
+    def sigint_handler(signum, frame):
+        """Handle sigint signal sent by parent
+
+        Send ack message with updated job runtime to server, and exit.
+
+        :param signum: signal number
+        :param frame: frame object
+        :return: None
+
+        """
+        end_time = time.time()
+        # Update job run time
+        current_job.run_time += (end_time - start_time)
+
+        # Prepare and send acknowledgement message for preemption
+        ack_job_preemp_msg = message.Message(msg_type='ACK_JOB_PREEMP',
+                                             content=current_job)
+        messageutils.send_message(msg=ack_job_preemp_msg, to=server_ip,
+                                  msg_socket=None, port=CLIENT_SEND_PORT)
+
+        # Gracefully exit
+        exit(0)
+
+    signal.signal(signal.SIGINT, sigint_handler)
+    subprocess.call([execution_dst])
+
+    # Prepare and send job completion message to server
+    job_completion_msg = message.Message(msg_type='JOB_COMP',
+                                         content=current_job)
+    messageutils.send_message(msg=job_completion_msg, to=server_ip,
+                              msg_socket=None, port=CLIENT_SEND_PORT)
+
+
+def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
+                         server_ip):
+    """Fork a process to execute the job
+
+    :param msg: message, received message of 'JOB_EXEC' msg_type
+    :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
+    :param num_execution_jobs_recvd: number of exection job messages received
+    :param server_ip: str, ip address of server
+    :return: None
+
+    """
+    # Get the job object
+    current_job = msg.content
+
+    # Make new job directory
+    current_job_directory = './execjob%s' % num_execution_jobs_recvd
+    if not os.path.exists(current_job_directory):
+        os.makedirs(current_job_directory)
+
+    # Store a.out in this directory
+    executable_file_bytes = msg.file
+    execution_dst = current_job_directory + '/a.out'
+    with open(execution_dst, 'wb') as file:
+        file.write(executable_file_bytes)
+
+    # Fork, and let the child run the executable
+    pid = os.fork()
+    if pid == 0:
+        # Child process
+        execute_job(current_job, execution_dst, server_ip)
+    else:
+        # Parent process
+        execution_jobs_pid_dict[current_job.receipt_id] = pid
+
+
+def job_preemption_msg_handler(msg, execution_jobs_pid_dict):
+    """Handle receive of job premption message
+
+    :param msg: message, received message
+    :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
+    :return: None
+
+    """
+    job_receipt_id = msg.content
+    # TODO: Check that job hasn't already completed
+    executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
+    os.kill(executing_child_pid, signal.SIGINT)
+    del execution_jobs_pid_dict[executing_child_pid]
 
 
 def main():
@@ -165,17 +264,21 @@ def main():
     submitted_jobs = set()
     acknowledged_jobs = set()
 
-    # Creating new process
-    process_interface = mp.Process(
+    # Dict to keep job_receipt_id: pid pairs
+    execution_jobs_pid_dict = {}
+    num_execution_jobs_recvd = 0
+
+    # Creating new process for job submission interface
+    process_submission_interface = mp.Process(
         target=submission_interface, args=(newstdin, job_array))
 
-    # Starting process
-    process_interface.start()
+    # Starting job submission interface process
+    process_submission_interface.start()
 
     # TODO: Receive acknowledgement and handle
     msg_socket = socket.socket()
     msg_socket.bind(('', CLIENT_RECV_PORT))
-    msg_socket.listen(1)
+    msg_socket.listen(5)
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
 
     connection, client_address = msg_socket.accept()
@@ -184,9 +287,15 @@ def main():
         msg = pickle.loads(data)
 
         if msg.msg_type == 'HEARTBEAT':
-            heartbeat_handler(job_array, submitted_jobs, server_ip)
+            heartbeat_msg_handler(job_array, submitted_jobs, server_ip)
         elif msg.msg_type == 'ACK_JOB_SUBMIT':
-            ack_job_submit_handler(msg, acknowledged_jobs)
+            ack_job_submit_msg_handler(msg, acknowledged_jobs)
+        elif msg.msg_type == 'JOB_EXEC':
+            num_execution_jobs_recvd += 1
+            job_exec_msg_handler(msg, server_ip, execution_jobs_pid_dict,
+                                 num_execution_jobs_recvd)
+        elif msg.msg_type == 'JOB_PREEMPT':
+            job_preemption_msg_handler(msg, execution_jobs_pid_dict)
 
         connection.close()
 

@@ -11,6 +11,10 @@ class Message(object):
                 Default: None.
                 HEARTBEAT: Dictionary of system resources available.
                 JOB_SUBMIT: Job object for the submitted job.
+                JOB_EXEC: Job object for the submitted job.
+                JOB_COMP: Job object for the submitted job.
+                ACK_JOB_SUBMIT: empty
+                ACK_JOB_PREEMP: Job object for the submitted job.
           sender: String with IP address of sender machine.
           file: Byte string with file contents. None by default.
     """
