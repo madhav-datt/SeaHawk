@@ -8,6 +8,7 @@ import socket
 import subprocess
 import time
 import signal
+import errno
 import os.path
 import multiprocessing as mp
 from shutil import copyfile
@@ -20,7 +21,8 @@ import message
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
 BUFFER_SIZE = 1048576
-JOB_EXECUTION_TIME_QUANTA = 1
+# Size of shared memory array
+JOB_ARRAY_SIZE = 50
 
 
 def submission_interface(newstdin, job_array):
@@ -153,7 +155,7 @@ def execute_job(current_job, execution_dst, server_ip):
     :return: None
 
     """
-    # Record start time for job
+    # Record start time for job, share the variable with sigint_handler
     start_time = time.time()
 
     def sigint_handler(signum, frame):
@@ -166,21 +168,35 @@ def execute_job(current_job, execution_dst, server_ip):
         :return: None
 
         """
-        end_time = time.time()
-        # Update job run time
-        current_job.run_time += (end_time - start_time)
+        preemption_end_time = time.time()
+
+        # Update job run time, completion status
+        current_job.time_run += (preemption_end_time - start_time)
+        if current_job.time_run >= current_job.time_required:
+            current_job.completed = True
 
         # Prepare and send acknowledgement message for preemption
-        ack_job_preemp_msg = message.Message(msg_type='ACK_JOB_PREEMP',
-                                             content=current_job)
-        messageutils.send_message(msg=ack_job_preemp_msg, to=server_ip,
+        ack_job_preempt_msg = message.Message(msg_type='ACK_JOB_PREEMPT',
+                                              content=current_job)
+        messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
                                   msg_socket=None, port=CLIENT_SEND_PORT)
 
         # Gracefully exit
-        exit(0)
+        os._exit(0)
 
+    # Mask the SIGINT signal with sigint_handler function
     signal.signal(signal.SIGINT, sigint_handler)
+
+    # Begin execution
     subprocess.call([execution_dst])
+    # Execution call completed
+    end_time = time.time()
+
+    # Update job run time
+    current_job.time_run += (end_time - start_time)
+
+    # Mark job completion
+    current_job.completed = True
 
     # Prepare and send job completion message to server
     job_completion_msg = message.Message(msg_type='JOB_COMP',
@@ -195,7 +211,7 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
 
     :param msg: message, received message of 'JOB_EXEC' msg_type
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
-    :param num_execution_jobs_recvd: number of exection job messages received
+    :param num_execution_jobs_recvd: number of execution job messages received
     :param server_ip: str, ip address of server
     :return: None
 
@@ -215,27 +231,42 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
         file.write(executable_file_bytes)
 
     # Fork, and let the child run the executable
-    pid = os.fork()
-    if pid == 0:
+    child_pid = os.fork()
+    if child_pid == 0:
         # Child process
         execute_job(current_job, execution_dst, server_ip)
     else:
         # Parent process
-        execution_jobs_pid_dict[current_job.receipt_id] = pid
+        os.waitpid(child_pid, 0)
+        execution_jobs_pid_dict[current_job.receipt_id] = child_pid
 
 
-def job_preemption_msg_handler(msg, execution_jobs_pid_dict):
-    """Handle receive of job premption message
+def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
+    """Handle receive of job preemption message
 
     :param msg: message, received message
     :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
+    :param server_ip: str, id address of server
     :return: None
 
     """
     job_receipt_id = msg.content
     # TODO: Check that job hasn't already completed
     executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
-    os.kill(executing_child_pid, signal.SIGINT)
+
+    # Send kill signal to child, which will be handled via sigint_handler
+    try:
+        os.kill(executing_child_pid, signal.SIGINT)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH: child process no longer exists
+            # Prepare and send acknowledgement message for preemption
+            ack_job_preempt_msg = message.Message(msg_type='ACK_JOB_PREEMPT',
+                                                 content='No preemption needed')
+            messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
+                                      msg_socket=None, port=CLIENT_SEND_PORT)
+
+    # Remove key from executing process dict
     del execution_jobs_pid_dict[executing_child_pid]
 
 
@@ -254,11 +285,9 @@ def main():
 
     # New stdin descriptor for child process
     newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
-    # Size of shared memory array
-    job_array_size = 50
-    # Creating shared array of boolean data type with space for job_array_size
+    # Creating shared array of boolean data type with space for JOB_ARRAY_SIZE
     # booleans
-    job_array = mp.Array(c_bool, job_array_size)
+    job_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
     # Sets book-keeping submitted and acknowledged jobs
     submitted_jobs = set()
@@ -295,7 +324,7 @@ def main():
             job_exec_msg_handler(msg, server_ip, execution_jobs_pid_dict,
                                  num_execution_jobs_recvd)
         elif msg.msg_type == 'JOB_PREEMPT':
-            job_preemption_msg_handler(msg, execution_jobs_pid_dict)
+            job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip)
 
         connection.close()
 

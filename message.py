@@ -13,8 +13,11 @@ class Message(object):
                 JOB_SUBMIT: Job object for the submitted job.
                 JOB_EXEC: Job object for the submitted job.
                 JOB_COMP: Job object for the submitted job.
+                JOB_PREEMPT: receipt id of job
                 ACK_JOB_SUBMIT: empty
-                ACK_JOB_PREEMP: Job object for the submitted job.
+                ACK_JOB_PREEMPT: Job object for the submitted job, or the
+                    string 'No preemption needed' if the job already exited
+                    the executing machine.
           sender: String with IP address of sender machine.
           file: Byte string with file contents. None by default.
     """
