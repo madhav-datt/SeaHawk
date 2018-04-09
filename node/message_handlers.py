@@ -28,9 +28,12 @@ def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
     :param job_array: shared mp.array
     :param submitted_jobs: set, containing submitted job ids
     :param server_ip: str, ip address of server
-    :return: None
+    :return: float, heartbeat receive time
 
     """
+    # Record receive time of heartbeat message
+    heartbeat_recv_time = time.time()
+
     for itr in range(len(job_array)):
 
         if job_array[itr] and itr not in submitted_jobs:
@@ -60,6 +63,8 @@ def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
 
             # Send heartbeat back to the server
             messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+
+    return heartbeat_recv_time
 
 
 def ack_job_submit_msg_handler(msg, acknowledged_jobs):
@@ -197,3 +202,17 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
 
     # Remove key from executing process dict
     del execution_jobs_pid_dict[executing_child_pid]
+
+
+def server_crash_msg_handler(server_ip, backup_ip):
+    """Handle a message recvd from server fault
+
+    :param server_ip: str, current server's ip, assumed to have crashed
+    :param backup_ip: str, backup server's ip
+    :return: (str, str), new server ip, new backup ip
+
+    """
+    # send first heartbeat to new primary server
+    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+    # switch primary and backup server ips in return
+    return backup_ip, server_ip

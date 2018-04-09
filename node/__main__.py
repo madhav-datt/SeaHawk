@@ -2,92 +2,70 @@
     and job submitter.
 """
 import sys
+import time
 import argparse
 import pickle
 import socket
 import os.path
 import multiprocessing as mp
-from shutil import copyfile
 from ctypes import c_bool
 
-from job import jobfileparser
-import node_message_handlers
+import message_handlers
+import submission_interface
+from messaging import message
 from messaging import messageutils
 
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
+# Buffer size for socket
 BUFFER_SIZE = 1048576
 # Size of shared memory array
 JOB_ARRAY_SIZE = 50
+# Time (in seconds) after which it's assumed that server has crashed
+CRASH_ASSUMPTION_TIME = 10
 
 
-def submission_interface(newstdin, job_array):
-    """Handle job submission interface.
+def detect_server_crash(last_heartbeat_recv_time):
+    """Run as a child process, periodically checking last heartbeat time.
 
-    Child process forked from main, with shared data array.
-
-    :param newstdin: stdin file descriptor given by parent
-    :param job_array: shared boolean array, for signalling submitted jobs to
-        parent
+    :param last_heartbeat_recv_time: shared mp.Value, float type
     :return: None
 
     """
-    sys.stdin = newstdin
-    project_name = 'SeaHawk'
-    print('*** Welcome to %s ***\n' % project_name)
+    # When a server crash detected, last_heartbeat_recv_time is
+    # set to time.time() + reset_time_allowance, to account for reset time.
+    reset_time_allowance = 5.
 
-    # Keep track of all created jobs, also used to index directory names - which
-    # store job files
-    num_created_jobs = 0
+    # Time to sleep in between checks, adaptive in nature
+    sleep_time = 5
 
-    print('Enter path address of job description file to submit new job:')
-    # keep looping and accepting jobs
+    # sleep_time will be set to (1 + sleep_time_additive)* (remaining timeout)
+    # should be strictly greater than 0
+    sleep_time_additive = 0.1
+
     while True:
-        jobfile_path = input('\n>>> ')
+        # Sleep for some time
+        time.sleep(sleep_time)
 
-        # check that entered path is correct and file exists
-        if not os.path.isfile(jobfile_path):
-            print('Invalid path, file does not exist at given location. Job '
-                  'not submitted.')
+        # Check with last heartbeat time for timeout
+        time_since_last_heartbeat = time.time() - last_heartbeat_recv_time
+        if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
+            # reset last heartbeat time, with reset time allowance
+            last_heartbeat_recv_time = time.time() + reset_time_allowance
 
+            # Make and send a crash message to main process which is listening
+            # on CLIENT_RECV_PORT for incoming messages
+            server_crash_message = message.Message(msg_type='SERVER_CRASH')
+            messageutils.send_message(msg=server_crash_message, to='127.0.0.1',
+                                      msg_socket=None, port=CLIENT_RECV_PORT)
+
+            # Reset sleep time to the time for reset allowance
+            sleep_time = reset_time_allowance
         else:
-            # Parse the job description file, make the job object and store
-            # object and executable in a directory
-            try:
-                current_job = jobfileparser.make_job(jobfile_path)
-                num_created_jobs += 1
-                current_job.submission_id = num_created_jobs
-
-            except ValueError as job_parse_error:
-                print(job_parse_error)
-                continue
-
-            # Make an empty directory to store job object pickle and executable
-            current_job_directory = './job' + str(num_created_jobs)
-            # Race conditions, but not a problem with current application
-            if not os.path.exists(current_job_directory):
-                os.makedirs(current_job_directory)
-
-            # Make job pickle, and save in the job directory by the name
-            # 'job.pickle'
-            job_object_path = current_job_directory + '/job.pickle'
-            with open(job_object_path, 'wb') as handle:
-                pickle.dump(
-                    current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # Copy executable to this directory
-            job_executable_name = current_job.get_executable_name()
-            job_executable_src_path = current_job.executable
-            job_executable_dst_path = \
-                current_job_directory + job_executable_name
-            # IOError possibility, but not a problem with current application
-            copyfile(job_executable_src_path, job_executable_dst_path)
-
-            # Set the flag in shared memory
-            job_array[num_created_jobs - 1] = True
-
-            print('Job queued for submission.')
-            # Continue looping: return to blocking state for user input
+            # sleep time updated adaptively
+            remaining_timeout = \
+                CRASH_ASSUMPTION_TIME - time_since_last_heartbeat
+            sleep_time = remaining_timeout * (1 + sleep_time_additive)
 
 
 def main():
@@ -96,8 +74,6 @@ def main():
     Job submission is handled entirely by a forked child process.
     Job execution is handed partly by this and a forked child process.
     Heartbeat messages are constantly exchanged.
-
-    TODO: Server fault detection and switching to backup ip
 
     """
     # Begin argument parsing
@@ -114,8 +90,7 @@ def main():
 
     # New stdin descriptor for child process
     newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
-    # Creating shared array of boolean data type with space for JOB_ARRAY_SIZE
-    # booleans
+    # Shared array of boolean data type with space for JOB_ARRAY_SIZE booleans
     job_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
     # Sets book-keeping submitted and acknowledged jobs
@@ -128,12 +103,24 @@ def main():
 
     # Creating new process for job submission interface
     process_submission_interface = mp.Process(
-        target=submission_interface, args=(newstdin, job_array))
+        target=submission_interface.run_submission_interface,
+        args=(newstdin, job_array)
+    )
 
     # Starting job submission interface process
     process_submission_interface.start()
 
-    # TODO: Receive acknowledgement and handle
+    # Shared variable storing time of last heartbeat receipt, of type float
+    last_heartbeat_recv_time = mp.Value('d')
+
+    # Creating new process for server crash detection
+    process_server_crash_detection = mp.Process(
+        target=detect_server_crash, args=(last_heartbeat_recv_time, )
+    )
+
+    # Starting server crash detection process
+    process_server_crash_detection.start()
+
     msg_socket = socket.socket()
     msg_socket.bind(('', CLIENT_RECV_PORT))
     msg_socket.listen(5)
@@ -144,22 +131,29 @@ def main():
         data = connection.recv(BUFFER_SIZE)
         msg = pickle.loads(data)
 
+        # TODO: Add condition: 'and msg.msg_type != 'I AM NEW SERVER' if needed
+        if msg.sender != server_ip:
+            # Old message from a server detected to have crashed, ignore
+            continue
+
         if msg.msg_type == 'HEARTBEAT':
-            node_message_handlers.heartbeat_msg_handler(job_array,
-                                                        submitted_jobs,
-                                                        server_ip)
+            last_heartbeat_recv_time = message_handlers.heartbeat_msg_handler(
+                job_array, submitted_jobs, server_ip)
         elif msg.msg_type == 'ACK_JOB_SUBMIT':
-            node_message_handlers.ack_job_submit_msg_handler(msg,
-                                                             acknowledged_jobs)
+            message_handlers.ack_job_submit_msg_handler(msg,
+                                                        acknowledged_jobs)
         elif msg.msg_type == 'JOB_EXEC':
             num_execution_jobs_recvd += 1
-            node_message_handlers.job_exec_msg_handler(msg, server_ip,
-                                                       execution_jobs_pid_dict,
-                                                       num_execution_jobs_recvd)
+            message_handlers.job_exec_msg_handler(msg, server_ip,
+                                                  execution_jobs_pid_dict,
+                                                  num_execution_jobs_recvd)
         elif msg.msg_type == 'JOB_PREEMPT':
-            node_message_handlers.\
+            message_handlers.\
                 job_preemption_msg_handler(msg, execution_jobs_pid_dict,
                                            server_ip)
+        elif msg.msg_type == 'SERVER_CRASH':
+            server_ip, backup_ip = message_handlers.server_crash_msg_handler(
+                server_ip, backup_ip)
 
         connection.close()
 
