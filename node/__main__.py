@@ -10,9 +10,9 @@ import multiprocessing as mp
 from shutil import copyfile
 from ctypes import c_bool
 
-import jobfileparser
+from job import jobfileparser
 import node_message_handlers
-import messageutils
+from messaging import messageutils
 
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006

@@ -14,8 +14,8 @@ import signal
 import pickle
 import subprocess
 
-import message
-import messageutils
+from messaging import message
+from messaging import messageutils
 
 
 CLIENT_RECV_PORT = 5005
