@@ -116,6 +116,8 @@ def main():
     # Starting job submission interface process
     process_submission_interface.start()
 
+    return
+
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d')
 

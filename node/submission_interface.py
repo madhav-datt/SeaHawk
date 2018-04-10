@@ -57,6 +57,7 @@ def run_submission_interface(newstdin, shared_job_array,
                                                         shared_job_array)
             if submission_success:
                 print('Job queued for submission.')
+                num_created_jobs += 1
             else:
                 print('Job not submitted.')
 
@@ -164,6 +165,7 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
     """
     # Handle job submission by reading jobfile path in args
     jobfile_path = command_args[0]
+    job_id = num_created_jobs + 1
 
     # check that entered path is correct and file exists
     if not os.path.isfile(jobfile_path):
@@ -174,15 +176,14 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
         # object and executable in a directory
         try:
             current_job = jobfile_parser.make_job(jobfile_path)
-            num_created_jobs += 1
-            current_job.submission_id = num_created_jobs
+            current_job.submission_id = job_id
 
         except ValueError as job_parse_error:
             print(job_parse_error)
             return False
 
         # Make empty directory to store job object pickle & executable
-        current_job_directory = './job' + str(num_created_jobs)
+        current_job_directory = './job' + str(job_id)
         # Race conditions, but not a problem with current application
         if not os.path.exists(current_job_directory):
             os.makedirs(current_job_directory)
@@ -203,7 +204,7 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
                         job_executable_dst_path)
 
         # Set the flag in shared memory
-        shared_job_array[num_created_jobs - 1] = True
+        shared_job_array[num_created_jobs] = True
 
         # Return successful submission
         return True
