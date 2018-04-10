@@ -102,7 +102,7 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
 
     # Store a.out in this directory
     executable_file_bytes = msg.file
-    execution_dst = current_job_directory + '/a.out'
+    execution_dst = current_job_directory + current_job.get_executable_name()
     with open(execution_dst, 'wb') as file:
         file.write(executable_file_bytes)
 
