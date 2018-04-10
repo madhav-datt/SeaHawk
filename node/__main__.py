@@ -1,6 +1,11 @@
 """ Job submission handler, responsible for communication with central server,
     and job submitter.
 
+    * TODO
+        - Add executing_machine_id:time_executed dict in job
+        - When server crash detected, send all non-ack messages
+        - Maintain all jobs (submit + execute) until completion ack received
+
 """
 import sys
 import time
@@ -158,9 +163,13 @@ def main():
                 job_preemption_msg_handler(msg, execution_jobs_pid_dict,
                                            server_ip)
 
-        elif msg.msg_type == 'JOB_COMPLETION':
-            message_handlers.job_completion_msg_handler(
+        elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
+            message_handlers.submitted_job_completion_msg_handler(
                 msg, shared_completed_jobs_array, server_ip)
+
+        elif msg.msg_type == 'EXECUTING_JOB_COMPLETION':
+            # TODO: Handle this
+            pass
 
         elif msg.msg_type == 'SERVER_CRASH':
             server_ip, backup_ip = message_handlers.server_crash_msg_handler(

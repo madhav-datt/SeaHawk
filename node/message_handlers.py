@@ -147,8 +147,10 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     del execution_jobs_pid_dict[executing_child_pid]
 
 
-def job_completion_msg_handler(msg, shared_completed_jobs_array, server_ip):
-    """Handle job completion message recvd from server, send ack to server
+def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
+                                         server_ip):
+    """Handle submitted job completion message recvd from server,
+        send ack to server
 
     :param msg: message, the received message
     :param shared_completed_jobs_array: set, submission ids of all completed
@@ -171,8 +173,8 @@ def job_completion_msg_handler(msg, shared_completed_jobs_array, server_ip):
         file.write(msg.file)
 
     # Prepare and send acknowledgement message for completion message
-    ack_job_completion_msg = message.Message(msg_type='ACK_JOB_COMPLETION',
-                                             content=current_job.receipt_id)
+    ack_job_completion_msg = message.Message(
+        msg_type='ACK_SUBMITTED_JOB_COMPLETION', content=current_job.receipt_id)
     messageutils.send_message(msg=ack_job_completion_msg, to=server_ip,
                               msg_socket=None, port=CLIENT_SEND_PORT)
 

@@ -12,16 +12,28 @@ class Message(object):
                 HEARTBEAT: Dictionary of system resources available.
                 JOB_SUBMIT: Job object for the submitted job.
                 JOB_EXEC: Job object for the submitted job.
-                JOB_COMP: Job object for the submitted job.
+                EXECUTING_JOB_COMPLETION: Job object for the submitted job.
                 JOB_PREEMPT: Receipt id of job
                 ACK_JOB_SUBMIT: Empty?
                 ACK_JOB_PREEMPT: Job object for the submitted job, or the
                     string 'No preemption needed' if the job already exited
                     the executing machine.
-                JOB_COMPLETION: Job object for the submitted job.
-                ACK_JOB_COMPLETION: Receipt id of submitted job
+                SUBMITTED_JOB_COMPLETION: Job object for the submitted job.
+                ACK_SUBMITTED_JOB_COMPLETION: Receipt id of submitted job
+                ACK_EXECUTING_JOB_COMPLETION: Receipt id of submitted job
           sender: String with IP address of sender machine.
-          file: Byte string with file contents. None by default.
+          file: Byte string with file contents.
+                Default: None
+                HEARTBEAT: None
+                JOB_SUBMIT: executable
+                JOB_EXEC: executable
+                EXECUTING_JOB_COMPLETION: None
+                JOB_PREEMPT: None
+                ACK_JOB_SUBMIT: None
+                ACK_JOB_PREEMPT: None
+                SUBMITTED_JOB_COMPLETION: None
+                ACK_SUBMITTED_JOB_COMPLETION: None
+                ACK_EXECUTING_JOB_COMPLETION: None
     """
 
     def __init__(self, msg_type, content=None, file_path=None):

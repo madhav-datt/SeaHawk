@@ -61,7 +61,7 @@ def execute_job(current_job, execution_dst, server_ip):
     current_job.completed = True
 
     # Prepare and send job completion message to server
-    job_completion_msg = message.Message(msg_type='JOB_COMP',
+    job_completion_msg = message.Message(msg_type='EXECUTING_JOB_COMPLETION',
                                          content=current_job)
     messageutils.send_message(msg=job_completion_msg, to=server_ip,
                               msg_socket=None, port=CLIENT_SEND_PORT)
