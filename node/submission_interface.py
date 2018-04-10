@@ -43,79 +43,32 @@ def run_submission_interface(newstdin, shared_job_array,
 
         # Take action for each type of command
         if command_type == 'EMPTY':
+            # Empty string input, continue looping
             continue
+
         elif command_type == 'HELP':
-            # Nothing to be done, continue looping
-            continue
+            # Print help message
+            print_help_message()
+
         elif command_type == 'SUBMIT':
-            # Handle job submission by reading jobfile path in args
-            jobfile_path = args[0]
-
-            # check that entered path is correct and file exists
-            if not os.path.isfile(jobfile_path):
-                print('Invalid job file path, '
-                      'file does not exist at given location. '
-                      'Job not submitted.')
-            else:
-                # Parse the job description file, make the job object and store
-                # object and executable in a directory
-                try:
-                    current_job = jobfile_parser.make_job(jobfile_path)
-                    num_created_jobs += 1
-                    current_job.submission_id = num_created_jobs
-
-                except ValueError as job_parse_error:
-                    print(job_parse_error)
-                    continue
-
-                # Make empty directory to store job object pickle & executable
-                current_job_directory = './job' + str(num_created_jobs)
-                # Race conditions, but not a problem with current application
-                if not os.path.exists(current_job_directory):
-                    os.makedirs(current_job_directory)
-
-                # Make job pickle, and save in the job directory by the name
-                # 'job.pickle'
-                job_object_path = current_job_directory + '/job.pickle'
-                with open(job_object_path, 'wb') as handle:
-                    pickle.dump(
-                        current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-                # Copy executable to this directory
-                job_executable_name = current_job.get_executable_name()
-                job_executable_src_path = current_job.executable
-                job_executable_dst_path = \
-                    current_job_directory + job_executable_name
-                # IOError possible, but not with current application
-                shutil.copyfile(job_executable_src_path,
-                                job_executable_dst_path)
-
-                # Set the flag in shared memory
-                shared_job_array[num_created_jobs - 1] = True
-
+            # Handle job submission
+            submission_success = prepare_job_submission(args,
+                                                        num_created_jobs,
+                                                        shared_job_array)
+            if submission_success:
                 print('Job queued for submission.')
-                # Continue looping: return to blocking state for user input
+            else:
+                print('Job not submitted.')
 
         elif command_type == 'STATUS':
-            total_received_jobs = 0
+            # Print status of all received jobs
+            print_status(shared_job_array, shared_submitted_jobs_array,
+                         shared_acknowledged_jobs_array,
+                         shared_completed_jobs_array)
 
-            def yn_map(bool_val):
-                return 'Y' if bool_val else 'N'
-
-            print('\n%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
-                                              'ACKNOWLEDGED', 'COMPLETED'))
-            for id_num in range(len(shared_job_array)):
-                if shared_job_array[id_num]:
-                    total_received_jobs += 1
-                    print('%-10s%-15s%-15s%-15s'
-                          % (id_num+1,
-                             yn_map(shared_submitted_jobs_array[id_num]),
-                             yn_map(shared_acknowledged_jobs_array[id_num]),
-                             yn_map(shared_completed_jobs_array[id_num]),))
-            if total_received_jobs == 0:
-                print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))
-            else:
-                print('\nTotal received jobs: %d\n' % total_received_jobs)
+        elif command_type == 'IMPROPER COMMAND':
+            # Print error message for given command
+            print_error_message(command)
 
 
 def print_welcome_message():
@@ -141,6 +94,37 @@ def print_help_message():
           "2)\"status\" to get status of all submitted jobs")
 
 
+def print_status(shared_job_array, shared_submitted_jobs_array,
+                 shared_acknowledged_jobs_array, shared_completed_jobs_array):
+    """Print the status of all received jobs to terminal
+
+    :param shared_job_array: mp.Array of type bool
+    :param shared_submitted_jobs_array: mp.Array of type bool
+    :param shared_acknowledged_jobs_array: mp.Array of type bool
+    :param shared_completed_jobs_array: mp.Array of type bool
+
+    """
+    total_received_jobs = 0
+
+    def yn_map(bool_val):
+        return 'Y' if bool_val else 'N'
+
+    print('\n%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
+                                      'ACKNOWLEDGED', 'COMPLETED'))
+    for id_num in range(len(shared_job_array)):
+        if shared_job_array[id_num]:
+            total_received_jobs += 1
+            print('%-10s%-15s%-15s%-15s'
+                  % (id_num + 1,
+                     yn_map(shared_submitted_jobs_array[id_num]),
+                     yn_map(shared_acknowledged_jobs_array[id_num]),
+                     yn_map(shared_completed_jobs_array[id_num]),))
+    if total_received_jobs == 0:
+        print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))
+    else:
+        print('\nTotal received jobs: %d\n' % total_received_jobs)
+
+
 def command_parser(command):
     """Parse the input command and return type, and any accompanying arguments
 
@@ -153,18 +137,73 @@ def command_parser(command):
     if command == "":
         return 'EMPTY', ()
     elif command == "help":
-        print_help_message()
         return 'HELP', ()
     elif command == "status":
         return 'STATUS', ()
     elif command.startswith("submit"):
         command_parts = command.split()
         if len(command_parts) != 2:
-            print_error_message(command)
             return 'IMPROPER COMMAND', ()
         else:
             jobfile_name = command_parts[1]
             return 'SUBMIT', (jobfile_name, )
     else:
-        print_error_message(command)
         return 'IMPROPER COMMAND', ()
+
+
+def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
+    """Handle preparation for job submission. Set flag for parent process
+    to check and submit the job
+
+    :param command_args: list, arguments from the command line
+    :param num_created_jobs: int, number of jobs that have already been created
+    :param shared_job_array: mp.Array of type c_bool, idx set to true if job
+        with that index has already been submitted
+    :return: bool, true for success, false for error/failure to submit.
+
+    """
+    # Handle job submission by reading jobfile path in args
+    jobfile_path = command_args[0]
+
+    # check that entered path is correct and file exists
+    if not os.path.isfile(jobfile_path):
+        print('Error: No file named %s' % jobfile_path)
+        return False
+    else:
+        # Parse the job description file, make the job object and store
+        # object and executable in a directory
+        try:
+            current_job = jobfile_parser.make_job(jobfile_path)
+            num_created_jobs += 1
+            current_job.submission_id = num_created_jobs
+
+        except ValueError as job_parse_error:
+            print(job_parse_error)
+            return False
+
+        # Make empty directory to store job object pickle & executable
+        current_job_directory = './job' + str(num_created_jobs)
+        # Race conditions, but not a problem with current application
+        if not os.path.exists(current_job_directory):
+            os.makedirs(current_job_directory)
+
+        # Make job pickle, save in the job directory as 'job.pickle'
+        job_object_path = current_job_directory + '/job.pickle'
+        with open(job_object_path, 'wb') as handle:
+            pickle.dump(
+                current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        # Copy executable to this directory
+        job_executable_name = current_job.get_executable_name()
+        job_executable_src_path = current_job.executable
+        job_executable_dst_path = \
+            current_job_directory + job_executable_name
+        # IOError possible, but not with current application
+        shutil.copyfile(job_executable_src_path,
+                        job_executable_dst_path)
+
+        # Set the flag in shared memory
+        shared_job_array[num_created_jobs - 1] = True
+
+        # Return successful submission
+        return True

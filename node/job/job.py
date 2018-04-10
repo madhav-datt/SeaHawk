@@ -22,6 +22,9 @@ class Job:
         time_run: float, number of seconds job has executed on a CPU. Note
             that we don't use exact time for which CPU executed it.
         completed: bool, whether job has completed execution.
+        execution_list: list, containing tuple elements
+            (executing machine name, time_run) for each machine that executes
+            this job
 
     """
     def __init__(self, name, executable, priority, time_required, min_memory,
@@ -55,6 +58,7 @@ class Job:
         # Job state
         self.time_run = 0
         self.completed = False
+        self.execution_list = []
 
     def get_executable_name(self):
         """ Return name of the executable file, by parsing the address."""

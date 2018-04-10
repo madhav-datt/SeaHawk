@@ -33,9 +33,14 @@ def execute_job(current_job, execution_dst, server_ip):
         preemption_end_time = time.time()
 
         # Update job run time, completion status
-        current_job.time_run += (preemption_end_time - start_time)
+        current_preempted_system_time_run = preemption_end_time - start_time
+        current_job.time_run += current_preempted_system_time_run
         if current_job.time_run >= current_job.time_required:
             current_job.completed = True
+
+        # Update the job's execution list with (machine name, time_run)
+        current_job.execution_list.append((os.uname()[1],
+                                           current_preempted_system_time_run))
 
         # Prepare and send acknowledgement message for preemption
         ack_job_preempt_msg = message.Message(msg_type='ACK_JOB_PREEMPT',
@@ -55,10 +60,15 @@ def execute_job(current_job, execution_dst, server_ip):
     end_time = time.time()
 
     # Update job run time
-    current_job.time_run += (end_time - start_time)
+    current_system_time_run = end_time - start_time
+    current_job.time_run += current_system_time_run
 
     # Mark job completion
     current_job.completed = True
+
+    # Update the job's execution list with (machine name, time_run)
+    current_job.execution_list.append((os.uname()[1],
+                                       current_system_time_run))
 
     # Prepare and send job completion message to server
     job_completion_msg = message.Message(msg_type='EXECUTING_JOB_COMPLETION',

@@ -2,7 +2,6 @@
     and job submitter.
 
     * TODO
-        - Add executing_machine_id:time_executed dict in job
         - When server crash detected, send all non-ack messages
         - Maintain all jobs (submit + execute) until completion ack received
 
