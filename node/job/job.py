@@ -56,7 +56,6 @@ class Job:
         self.time_run = 0
         self.completed = False
 
-
     def get_executable_name(self):
         """ Return name of the executable file, by parsing the address."""
         executable_address_partitions = self.executable.split('/')

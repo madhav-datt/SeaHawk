@@ -2,7 +2,8 @@
 
 import argparse
 import os
-from job import Job
+
+from .job import Job
 
 
 def parse_jobfile(jobfile_name):

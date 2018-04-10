@@ -5,6 +5,7 @@ Includes handlers for:
     * Acknowledgement of job submission from server
     * Job execution request from server
     * Job preemption request from server
+    * Server crash message from child executing crash detection
 
 """
 import os
@@ -12,21 +13,21 @@ import time
 import errno
 import signal
 import pickle
-import subprocess
 
 from messaging import message
 from messaging import messageutils
+from job import job_execution
+from network_params import CLIENT_SEND_PORT
 
 
-CLIENT_RECV_PORT = 5005
-CLIENT_SEND_PORT = 5006
-
-
-def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
+def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
+                          server_ip):
     """Scan job_array for jobs queued up for submission, send to server.
 
-    :param job_array: shared mp.array
-    :param submitted_jobs: set, containing submitted job ids
+    :param shared_job_array: shared mp.array, idx set to true if a job idx ever
+        requested submission
+    :param shared_submitted_jobs_array: shared mp.Array, where idx is set
+        to True if job has been submitted to server
     :param server_ip: str, ip address of server
     :return: float, heartbeat receive time
 
@@ -34,9 +35,9 @@ def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
     # Record receive time of heartbeat message
     heartbeat_recv_time = time.time()
 
-    for itr in range(len(job_array)):
+    for itr in range(len(shared_job_array)):
 
-        if job_array[itr] and itr not in submitted_jobs:
+        if shared_job_array[itr] and not shared_submitted_jobs_array[itr]:
 
             # Get job object from pickle
             job_description_filename = './job%s/job.pickle' % itr
@@ -57,85 +58,27 @@ def heartbeat_msg_handler(job_array, submitted_jobs, server_ip):
             messageutils.send_message(job_submission_msg, to=server_ip,
                                       msg_socket=None, port=CLIENT_SEND_PORT)
 
-            # Update submitted_jobs set
-            submitted_jobs.add(itr)
+            # Update shared_submitted_jobs_array
+            shared_submitted_jobs_array[itr] = True
             # TODO: Add log entry here
 
-            # Send heartbeat back to the server
-            messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+    # Send heartbeat back to the server
+    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
 
     return heartbeat_recv_time
 
 
-def ack_job_submit_msg_handler(msg, acknowledged_jobs):
+def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
     """Add job to acknowledged job set
 
     :param msg: message, received message
-    :param acknowledged_jobs: set, containing acknowledged job ids
+    :param shared_acknowledged_jobs_array: mp.Array, idx set to true if job
+        submission has been acknowledged by server
     :return: None
 
     """
     ack_job_id = msg.submission_id
-    acknowledged_jobs.add(ack_job_id)
-
-
-def execute_job(current_job, execution_dst, server_ip):
-    """Execute the executable file, and send submission results to server_ip
-
-    :param current_job: job object, to be executed
-    :param execution_dst: str, path to executable file
-    :param server_ip: str, ip address of server
-    :return: None
-
-    """
-    # Record start time for job, share the variable with sigint_handler
-    start_time = time.time()
-
-    def sigint_handler(signum, frame):
-        """Handle sigint signal sent by parent
-
-        Send ack message with updated job runtime to server, and exit.
-
-        :param signum: signal number
-        :param frame: frame object
-        :return: None
-
-        """
-        preemption_end_time = time.time()
-
-        # Update job run time, completion status
-        current_job.time_run += (preemption_end_time - start_time)
-        if current_job.time_run >= current_job.time_required:
-            current_job.completed = True
-
-        # Prepare and send acknowledgement message for preemption
-        ack_job_preempt_msg = message.Message(msg_type='ACK_JOB_PREEMPT',
-                                              content=current_job)
-        messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
-                                  msg_socket=None, port=CLIENT_SEND_PORT)
-
-        # Gracefully exit
-        os._exit(0)
-
-    # Mask the SIGINT signal with sigint_handler function
-    signal.signal(signal.SIGINT, sigint_handler)
-
-    # Begin execution
-    subprocess.call([execution_dst])
-    # Execution call completed
-    end_time = time.time()
-
-    # Update job run time
-    current_job.time_run += (end_time - start_time)
-
-    # Mark job completion
-    current_job.completed = True
-
-    # Prepare and send job completion message to server
-    job_completion_msg = message.Message(msg_type='JOB_COMP',
-                                         content=current_job)
-    messageutils.send_message(msg=job_completion_msg, to=server_ip,
-                              msg_socket=None, port=CLIENT_SEND_PORT)
+    shared_acknowledged_jobs_array[ack_job_id] = True
 
 
 def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
@@ -167,7 +110,7 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
     child_pid = os.fork()
     if child_pid == 0:
         # Child process
-        execute_job(current_job, execution_dst, server_ip)
+        job_execution.execute_job(current_job, execution_dst, server_ip)
     else:
         # Parent process
         os.waitpid(child_pid, 0)
@@ -184,10 +127,10 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
 
     """
     job_receipt_id = msg.content
-    # TODO: Check that job hasn't already completed
     executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
 
     # Send kill signal to child, which will be handled via sigint_handler
+    # sigint_handler will send ack_job_preempt_msg to central server
     try:
         os.kill(executing_child_pid, signal.SIGINT)
     except OSError as err:
@@ -204,8 +147,39 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     del execution_jobs_pid_dict[executing_child_pid]
 
 
+def job_completion_msg_handler(msg, shared_completed_jobs_array, server_ip):
+    """Handle job completion message recvd from server, send ack to server
+
+    :param msg: message, the received message
+    :param shared_completed_jobs_array: set, submission ids of all completed
+        jobs
+    :param server_ip: str, id address of server
+
+    """
+    # Get the job object from message's content field
+    current_job = msg.content
+
+    # Update the shared_completed_jobs_array
+    job_submission_id = current_job.submission_id
+    shared_completed_jobs_array[job_submission_id] = True
+
+    # Save the log file in the job's directory in the cwd
+    # TODO: Handle directory does not exist condition
+    job_directory = './job%s' % job_submission_id
+    run_log_file_path = job_directory + '/run_log'
+    with open(run_log_file_path, 'wb') as file:
+        file.write(msg.file)
+
+    # Prepare and send acknowledgement message for completion message
+    ack_job_completion_msg = message.Message(msg_type='ACK_JOB_COMPLETION',
+                                             content=current_job.receipt_id)
+    messageutils.send_message(msg=ack_job_completion_msg, to=server_ip,
+                              msg_socket=None, port=CLIENT_SEND_PORT)
+
+
 def server_crash_msg_handler(server_ip, backup_ip):
-    """Handle a message recvd from server fault
+    """Handle a message recvd from server fault detecting child process about
+    an assumed server crash at server_ip
 
     :param server_ip: str, current server's ip, assumed to have crashed
     :param backup_ip: str, backup server's ip
