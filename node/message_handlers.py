@@ -18,7 +18,6 @@ import errno
 import signal
 import pickle
 
-from messaging import message
 from messaging import messageutils
 from job import job_execution
 from network_params import CLIENT_SEND_PORT
@@ -59,16 +58,12 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
                 '%s%d%s' % (SUBMITTED_JOB_DIRECTORY_PREFIX, itr,
                             current_job.get_executable_name())
 
-            send_job_submit_msg(current_job, job_executable_filename, )
             # Make job submission message, with content as current job object,
-            # file_path as the executable file path
-            job_submission_msg = \
-                message.Message('JOB_SUBMIT', content=current_job,
-                                file_path=job_executable_filename)
-
-            # Send job submission message to server
-            messageutils.send_message(job_submission_msg, to=server_ip,
-                                      msg_socket=None, port=CLIENT_SEND_PORT)
+            # file_path as the executable file path. Send to server
+            messageutils.make_and_send_message(
+                msg_type='JOB_SUBMIT', content=current_job,
+                file_path=job_executable_filename, to=server_ip,
+                msg_socket=None, port=CLIENT_SEND_PORT)
 
             # Update shared_submitted_jobs_array
             shared_submitted_jobs_array[itr] = True
@@ -130,53 +125,52 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, server_ip):
         execution_jobs_pid_dict[current_job.receipt_id] = child_pid
 
 
-def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
-                               preempted_jobs_receipt_ids,
-                               preempted_ack_jobs_receipt_ids,
-                               server_ip):
+def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
     :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
-    :param preempted_jobs_receipt_ids: set, containing receipt ids of
-        executing jobs that have been preempted
-    :param preempted_ack_jobs_receipt_ids: set, containing receipt ids of
-        executing jobs whose preemption info has been ack by the server
     :param server_ip: str, id address of server
     :return: None
 
     """
     job_receipt_id = msg.content
 
-    if job_receipt_id in preempted_ack_jobs_receipt_ids:
-        return
-
-    elif job_receipt_id in preempted_jobs_receipt_ids:
-        resend_preempted_job_msg(job_receipt_id, server_ip)
-
+    # Get process id of child that executed/is executing this job
     executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
+
     # Send kill signal to child, which will be handled via sigint_handler
-    # sigint_handler will send ack_job_preempt_msg to central server
+    # sigint_handler will send EXECUTED_JOB to central server
     try:
         os.kill(executing_child_pid, signal.SIGINT)
     except OSError as err:
         if err.errno == errno.ESRCH:
             # ESRCH: child process no longer exists
-            # Prepare and send preempted job information message to server
-            ack_job_preempt_msg = \
-                message.Message(msg_type='PREEMPTED_JOB',
-                                content='No preemption needed')
-            messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
-                                      msg_socket=None, port=CLIENT_SEND_PORT)
+            # This implies that either this job was preempted, and this
+            # preemption message is a duplicate from switched server, or
+            # the process already completed and server didn't receive
+            # completion message before sending preempt request, or the servers
+            # switched. In any case, we resend the EXECUTED_JOB msg for safety.
 
-    # Remove key from executing process dict
-    del execution_jobs_pid_dict[executing_child_pid]
+            # Get job object from it's local directory
+            job_pickle_file = EXECUTING_JOB_DIRECTORY_PREFIX + \
+                              str(job_receipt_id) + JOB_PICKLE_FILE
+
+            with open(job_pickle_file, 'rb') as handle:
+                current_job = pickle.load(handle)
+
+            # Prepare and send executed job information message to server
+            messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
+                                               content=current_job,
+                                               file_path=None, to=server_ip,
+                                               msg_socket=None,
+                                               port=CLIENT_SEND_PORT)
 
 
-def resend_preempted_job_msg(job_receipt_id, server_ip):
+def resend_executed_job_msg(job_receipt_id, server_ip):
     """Helper function for job_preemption_msg_handler
 
-    Loads job pickle into job object and sends preempted_job_msg to server
+    Loads job pickle into job object and sends EXECUTED_JOB msg to server
 
     :param job_receipt_id: int, receipt id of job
     :param server_ip: str, server's ip address
@@ -189,8 +183,10 @@ def resend_preempted_job_msg(job_receipt_id, server_ip):
         current_job = pickle.load(handle)
 
     # Resend message to server
-    send_message(msg_type='PREEMPTED_JOB', content=current_job, file_path=None,
-                 to = server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
+    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
+                                       content=current_job, file_path=None,
+                                       to=server_ip, msg_socket=None,
+                                       port=CLIENT_SEND_PORT)
 
 
 def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
@@ -219,10 +215,10 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
         file.write(msg.file)
 
     # Prepare and send acknowledgement message for completion message
-    ack_job_completion_msg = message.Message(
-        msg_type='ACK_SUBMITTED_JOB_COMPLETION', content=current_job.receipt_id)
-    messageutils.send_message(msg=ack_job_completion_msg, to=server_ip,
-                              msg_socket=None, port=CLIENT_SEND_PORT)
+    messageutils.make_and_send_message(msg_type='ACK_SUBMITTED_JOB_COMPLETION',
+                                       content=current_job.receipt_id,
+                                       file_path=None, to=server_ip,
+                                       msg_socket=None, port=CLIENT_SEND_PORT)
 
 
 def server_crash_msg_handler(server_ip, backup_ip):

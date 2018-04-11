@@ -1,7 +1,7 @@
 """ Job submission handler, responsible for communication with central server,
     and job submitter.
 
-    Messages sent to server:
+    Messages sent to server by parent:
         - JOB_SUBMIT: a job is received on the submission interface, which
             prepares job files, and sets a flag in the shared memory.
             This flag is detected when this main process receives any kind of
@@ -11,23 +11,56 @@
         - HEARTBEAT: When this main process starts, it sends first heartbeat
             to server. After that, it responds with a heartbeat message to
             the server immediately after receiving a heartbeat from server.
+            Content of the message contains current system resources' status.
             
-        - PREEMPTED_JOB: On receiving a JOB_PREEMPT message from server,
-            this main process carries out the preemption procedure, and
-            sends an PREEMPTED_JOB message to the server, with updated job
-            object (job.run_time, job.execution_list, job.completed are updated)
+        - EXECUTED_JOB: Sent to server on either completing a job execution
+            (in this case, sent by the job execution child process), or on
+            receiving a JOB_PREEMPT message from server, this main process
+            carries out  the preemption procedure, and sends an
+            EXECUTED_JOB message to the server, with updated job object
+            (job.run_time, job.execution_list, job.completed are updated)
             in the content field.
             On receiving a JOB_PREEMPT for an already preempted job, if
-            ACK_PREEMPTED_JOB has been received for that job, then the
-            duplicate JOB_PREEMPT is ignored, otherwise PREEMPTED_JOB message
-            is sent out again.
+            ACK_EXECUTED_JOB has been received for that job, then the
+            duplicate JOB_PREEMPT is ignored, otherwise EXECUTED_JOB message
+            is sent again.
 
-        -
+        - ACK_SUBMITTED_JOB_COMPLETION: Sent on receiving
+            SUBMITTED_JOB_COMPLETION from server. Content field has receipt id.
+
+    Message sent to server by a child:
+        - EXECUTED_JOB: As explained before, sent by execute_job() function
+            in job_execution.py
+
+    Messages received from child processes:
+        - SERVER_CRASH: The child process detects missing heartbeat message
+            for a long time, and sends SERVER_CRASH message to this
+            main process.
+
+    Messages received from server:
+        - HEARTBEAT: Server sends this message in response to HEARTBEAT message
+            by node. A delay can/should be there in server's response, so that
+            heartbeat messages do not congest the network.
+
+        - ACK_JOB_SUBMIT: Server sends this message on receiving a JOB_SUBMIT
+            message from the node. Should include job's submission id in
+            message's content field.
+
+        - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message
+
+        - JOB_EXEC: Sent by server requesting execution of a job on the node.
+            Should have job object in content, and executable in file field.
+
+        - JOB_PREEMPT: Sent by server requesting preemption of an executing
+            job. In
+
+        - SUBMITTED_JOB_COMPLETION: Server, on receiving EXECUTED_JOB message
+            from a node, checks job's 'completed' attribute, and if True,
+            sends SUBMITTED_JOB_COMPLETION to submitting node
 
     * TODO
-        - Handle duplicate JOB_PREEMPT from switched server
         - When server crash detected, send all non-ack messages
-        - Maintain all jobs (submit + execute) until completion ack received
+        - For above, need to maintain executed_job msgs sent and acknowledged
 
 """
 import sys
@@ -41,7 +74,6 @@ from ctypes import c_bool
 
 import message_handlers
 import submission_interface
-from messaging import message
 from messaging import messageutils
 from network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, BUFFER_SIZE
 
@@ -83,9 +115,11 @@ def detect_server_crash(shared_last_heartbeat_recv_time):
 
             # Make and send a crash message to main process which is listening
             # on CLIENT_RECV_PORT for incoming messages
-            server_crash_message = message.Message(msg_type='SERVER_CRASH')
-            messageutils.send_message(msg=server_crash_message, to='127.0.0.1',
-                                      msg_socket=None, port=CLIENT_RECV_PORT)
+            # TODO: Check if 'to' needs to be changed to socket.gethostname()
+            messageutils.make_and_send_message(msg_type='SERVER_CRASH',
+                                               content=None, file_path=None,
+                                               to='127.0.0.1', msg_socket=None,
+                                               port=CLIENT_RECV_PORT)
 
             # Reset sleep time to the time for reset allowance
             sleep_time = reset_time_allowance
@@ -125,11 +159,6 @@ def main():
     shared_submitted_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_acknowledged_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
-
-    # Sets to store preemption and preemption ack status of executing jobs
-    # Receipt id of jobs are stored in these sets
-    preempted_jobs_receipt_ids = set()
-    preempted_ack_jobs_receipt_ids = set()
 
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = {}
@@ -172,6 +201,8 @@ def main():
             continue
 
         if msg.msg_type == 'HEARTBEAT':
+            # Removing pycharm's annoying unused warning for shared variable
+            # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time = \
                 message_handlers.heartbeat_msg_handler(
                     shared_job_array, shared_submitted_jobs_array, server_ip)
@@ -187,19 +218,12 @@ def main():
                                                   execution_jobs_pid_dict)
 
         elif msg.msg_type == 'JOB_PREEMPT':
-            message_handlers.\
-                job_preemption_msg_handler(msg, execution_jobs_pid_dict,
-                                           preempted_jobs_receipt_ids,
-                                           preempted_ack_jobs_receipt_ids,
-                                           server_ip)
+            message_handlers.job_preemption_msg_handler(
+                msg, execution_jobs_pid_dict, server_ip)
 
         elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
             message_handlers.submitted_job_completion_msg_handler(
                 msg, shared_completed_jobs_array, server_ip)
-
-        elif msg.msg_type == 'EXECUTING_JOB_COMPLETION':
-            # TODO: Handle this
-            pass
 
         elif msg.msg_type == 'SERVER_CRASH':
             server_ip, backup_ip = message_handlers.server_crash_msg_handler(
