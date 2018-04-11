@@ -1,7 +1,31 @@
 """ Job submission handler, responsible for communication with central server,
     and job submitter.
 
+    Messages sent to server:
+        - JOB_SUBMIT: a job is received on the submission interface, which
+            prepares job files, and sets a flag in the shared memory.
+            This flag is detected when this main process receives any kind of
+            message, and then JOB_SUBMIT is sent to server, with job object
+            in content field and executable file in file field of the message.
+        
+        - HEARTBEAT: When this main process starts, it sends first heartbeat
+            to server. After that, it responds with a heartbeat message to
+            the server immediately after receiving a heartbeat from server.
+            
+        - PREEMPTED_JOB: On receiving a JOB_PREEMPT message from server,
+            this main process carries out the preemption procedure, and
+            sends an PREEMPTED_JOB message to the server, with updated job
+            object (job.run_time, job.execution_list, job.completed are updated)
+            in the content field.
+            On receiving a JOB_PREEMPT for an already preempted job, if
+            ACK_PREEMPTED_JOB has been received for that job, then the
+            duplicate JOB_PREEMPT is ignored, otherwise PREEMPTED_JOB message
+            is sent out again.
+
+        -
+
     * TODO
+        - Handle duplicate JOB_PREEMPT from switched server
         - When server crash detected, send all non-ack messages
         - Maintain all jobs (submit + execute) until completion ack received
 
@@ -102,6 +126,11 @@ def main():
     shared_acknowledged_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
+    # Sets to store preemption and preemption ack status of executing jobs
+    # Receipt id of jobs are stored in these sets
+    preempted_jobs_receipt_ids = set()
+    preempted_ack_jobs_receipt_ids = set()
+
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = {}
     num_execution_jobs_recvd = 0
@@ -115,8 +144,6 @@ def main():
 
     # Starting job submission interface process
     process_submission_interface.start()
-
-    return
 
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d')
@@ -154,14 +181,16 @@ def main():
                 msg, shared_acknowledged_jobs_array)
 
         elif msg.msg_type == 'JOB_EXEC':
+            # TODO: See if num_execution_jobs_recvd is useful anywhere
             num_execution_jobs_recvd += 1
             message_handlers.job_exec_msg_handler(msg, server_ip,
-                                                  execution_jobs_pid_dict,
-                                                  num_execution_jobs_recvd)
+                                                  execution_jobs_pid_dict)
 
         elif msg.msg_type == 'JOB_PREEMPT':
             message_handlers.\
                 job_preemption_msg_handler(msg, execution_jobs_pid_dict,
+                                           preempted_jobs_receipt_ids,
+                                           preempted_ack_jobs_receipt_ids,
                                            server_ip)
 
         elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
@@ -176,6 +205,7 @@ def main():
             server_ip, backup_ip = message_handlers.server_crash_msg_handler(
                 server_ip, backup_ip)
 
+        # TODO: Is this correct?
         connection.close()
 
 

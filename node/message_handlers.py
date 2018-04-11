@@ -5,7 +5,11 @@ Includes handlers for:
     * Acknowledgement of job submission from server
     * Job execution request from server
     * Job preemption request from server
+    * Submitted job completion message from server
     * Server crash message from child executing crash detection
+
+TODO:
+    * Move send_message functions to messageutils.py
 
 """
 import os
@@ -18,6 +22,10 @@ from messaging import message
 from messaging import messageutils
 from job import job_execution
 from network_params import CLIENT_SEND_PORT
+
+SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
+EXECUTING_JOB_DIRECTORY_PREFIX = './exec_job'
+JOB_PICKLE_FILE = '/job.pickle'
 
 
 def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
@@ -40,14 +48,18 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         if shared_job_array[itr] and not shared_submitted_jobs_array[itr]:
 
             # Get job object from pickle
-            job_description_filename = './job%s/job.pickle' % itr
+            job_description_filename = '%s%d%s' \
+                                       % (SUBMITTED_JOB_DIRECTORY_PREFIX, itr,
+                                          JOB_PICKLE_FILE)
             with open(job_description_filename, 'rb') as handle:
                 current_job = pickle.load(handle)
 
             # Get job executable filepath
             job_executable_filename = \
-                './job%s/%s' % (itr, current_job.get_executable_name())
+                '%s%d%s' % (SUBMITTED_JOB_DIRECTORY_PREFIX, itr,
+                            current_job.get_executable_name())
 
+            send_job_submit_msg(current_job, job_executable_filename, )
             # Make job submission message, with content as current job object,
             # file_path as the executable file path
             job_submission_msg = \
@@ -81,13 +93,11 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
     shared_acknowledged_jobs_array[ack_job_id] = True
 
 
-def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
-                         server_ip):
+def job_exec_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     """Fork a process to execute the job
 
     :param msg: message, received message of 'JOB_EXEC' msg_type
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
-    :param num_execution_jobs_recvd: number of execution job messages received
     :param server_ip: str, ip address of server
     :return: None
 
@@ -96,7 +106,8 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
     current_job = msg.content
 
     # Make new job directory
-    current_job_directory = './execjob%s' % num_execution_jobs_recvd
+    current_job_directory = '%s%d' % (EXECUTING_JOB_DIRECTORY_PREFIX,
+                                      current_job.receipt_id)
     if not os.path.exists(current_job_directory):
         os.makedirs(current_job_directory)
 
@@ -110,25 +121,40 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, num_execution_jobs_recvd,
     child_pid = os.fork()
     if child_pid == 0:
         # Child process
-        job_execution.execute_job(current_job, execution_dst, server_ip)
+        job_execution.execute_job(current_job, execution_dst,
+                                  current_job_directory,
+                                  server_ip)
     else:
         # Parent process
         os.waitpid(child_pid, 0)
         execution_jobs_pid_dict[current_job.receipt_id] = child_pid
 
 
-def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
+def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
+                               preempted_jobs_receipt_ids,
+                               preempted_ack_jobs_receipt_ids,
+                               server_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
     :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
+    :param preempted_jobs_receipt_ids: set, containing receipt ids of
+        executing jobs that have been preempted
+    :param preempted_ack_jobs_receipt_ids: set, containing receipt ids of
+        executing jobs whose preemption info has been ack by the server
     :param server_ip: str, id address of server
     :return: None
 
     """
     job_receipt_id = msg.content
-    executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
 
+    if job_receipt_id in preempted_ack_jobs_receipt_ids:
+        return
+
+    elif job_receipt_id in preempted_jobs_receipt_ids:
+        resend_preempted_job_msg(job_receipt_id, server_ip)
+
+    executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
     # Send kill signal to child, which will be handled via sigint_handler
     # sigint_handler will send ack_job_preempt_msg to central server
     try:
@@ -136,15 +162,35 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     except OSError as err:
         if err.errno == errno.ESRCH:
             # ESRCH: child process no longer exists
-            # Prepare and send acknowledgement message for preemption
+            # Prepare and send preempted job information message to server
             ack_job_preempt_msg = \
-                message.Message(msg_type='ACK_JOB_PREEMPT',
+                message.Message(msg_type='PREEMPTED_JOB',
                                 content='No preemption needed')
             messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
                                       msg_socket=None, port=CLIENT_SEND_PORT)
 
     # Remove key from executing process dict
     del execution_jobs_pid_dict[executing_child_pid]
+
+
+def resend_preempted_job_msg(job_receipt_id, server_ip):
+    """Helper function for job_preemption_msg_handler
+
+    Loads job pickle into job object and sends preempted_job_msg to server
+
+    :param job_receipt_id: int, receipt id of job
+    :param server_ip: str, server's ip address
+
+    """
+    # Load job object into current_job
+    job_pickle_file = '%s%d%s' % (EXECUTING_JOB_DIRECTORY_PREFIX,
+                                  job_receipt_id, JOB_PICKLE_FILE)
+    with open(job_pickle_file, 'rb') as handle:
+        current_job = pickle.load(handle)
+
+    # Resend message to server
+    send_message(msg_type='PREEMPTED_JOB', content=current_job, file_path=None,
+                 to = server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
 
 
 def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
@@ -167,7 +213,7 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
 
     # Save the log file in the job's directory in the cwd
     # TODO: Handle directory does not exist condition
-    job_directory = './job%s' % job_submission_id
+    job_directory = '%s%d' % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_submission_id)
     run_log_file_path = job_directory + '/run_log'
     with open(run_log_file_path, 'wb') as file:
         file.write(msg.file)
@@ -188,7 +234,9 @@ def server_crash_msg_handler(server_ip, backup_ip):
     :return: (str, str), new server ip, new backup ip
 
     """
+    # switch primary and backup server ips
+    server_ip, backup_ip = backup_ip, server_ip
     # send first heartbeat to new primary server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
-    # switch primary and backup server ips in return
+    # return the switched primary and server ips
     return backup_ip, server_ip

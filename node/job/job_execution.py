@@ -1,6 +1,7 @@
 import os
 import time
 import signal
+import pickle
 import subprocess
 
 from messaging import message
@@ -8,11 +9,13 @@ from messaging import messageutils
 from network_params import CLIENT_SEND_PORT
 
 
-def execute_job(current_job, execution_dst, server_ip):
+def execute_job(current_job, execution_dst, current_job_directory,
+                server_ip):
     """Execute the executable file, and send submission results to server_ip
 
     :param current_job: job object, to be executed
     :param execution_dst: str, path to executable file
+    :param current_job_directory: str, directory storing job's files
     :param server_ip: str, ip address of server
     :return: None
 
@@ -42,10 +45,17 @@ def execute_job(current_job, execution_dst, server_ip):
         current_job.execution_list.append((os.uname()[1],
                                            current_preempted_system_time_run))
 
-        # Prepare and send acknowledgement message for preemption
-        ack_job_preempt_msg = message.Message(msg_type='ACK_JOB_PREEMPT',
-                                              content=current_job)
-        messageutils.send_message(msg=ack_job_preempt_msg, to=server_ip,
+        # Save job object as pickle in it's local directory. This is done
+        # so that preempted_job_msg can be replayed if server goes down
+        # before receiving/acknowledging it
+        _job_pickle_file = current_job_directory + '/job.pickle'
+        with open(_job_pickle_file, 'wb') as _handle:
+            pickle.dump(current_job, _handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        # Prepare and send preempted job information message to server
+        preempted_job_msg = message.Message(msg_type='PREEMPTED_JOB',
+                                            content=current_job)
+        messageutils.send_message(msg=preempted_job_msg, to=server_ip,
                                   msg_socket=None, port=CLIENT_SEND_PORT)
 
         # Gracefully exit
@@ -69,6 +79,13 @@ def execute_job(current_job, execution_dst, server_ip):
     # Update the job's execution list with (machine name, time_run)
     current_job.execution_list.append((os.uname()[1],
                                        current_system_time_run))
+
+    # Save job object as pickle in it's local directory. This is done
+    # so that job_completion_msg can be replayed if server goes down
+    # before receiving/acknowledging it
+    job_pickle_file = current_job_directory + '/job.pickle'
+    with open(job_pickle_file, 'wb') as handle:
+        pickle.dump(current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Prepare and send job completion message to server
     job_completion_msg = message.Message(msg_type='EXECUTING_JOB_COMPLETION',

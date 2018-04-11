@@ -2,13 +2,30 @@
 """
 
 import io
-import message
 import pickle
 import psutil
 import socket
 
+from . import message
+
 BUFFER_SIZE = 1048576
 PORT = 5005
+
+
+def make_and_send_message(msg_type, content, file_path, to, msg_socket, port):
+    """Construct a message object with given attributes & send to address
+
+    :param msg_type: str, one of the pre-defined message types
+    :param content: obj, custom message content
+    :param file_path: str, destination address of file to accompany message
+    :param to: str, ip address of destination machine
+    :param msg_socket: socket, via which to send the message
+    :param port: int, port number on which message should be received
+
+    """
+    msg = message.Message(msg_type=msg_type, content=content,
+                          file_path=file_path)
+    send_message(msg=msg, to=to, msg_socket=msg_socket, port=port)
 
 
 def send_message(msg, to, msg_socket=None, port=PORT):

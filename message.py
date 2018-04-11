@@ -14,10 +14,9 @@ class Message(object):
                 JOB_EXEC: Job object for the submitted job.
                 EXECUTING_JOB_COMPLETION: Job object for the submitted job.
                 JOB_PREEMPT: Receipt id of job
+                PREEMPTED_JOB: Job object for the executing/preempted job.
                 ACK_JOB_SUBMIT: Empty?
-                ACK_JOB_PREEMPT: Job object for the submitted job, or the
-                    string 'No preemption needed' if the job already exited
-                    the executing machine.
+                ACK_PREEMPTED_JOB: Receipt id of job
                 SUBMITTED_JOB_COMPLETION: Job object for the submitted job.
                 ACK_SUBMITTED_JOB_COMPLETION: Receipt id of submitted job
                 ACK_EXECUTING_JOB_COMPLETION: Receipt id of submitted job
@@ -29,9 +28,10 @@ class Message(object):
                 JOB_EXEC: executable
                 EXECUTING_JOB_COMPLETION: None
                 JOB_PREEMPT: None
+                PREEMPTED_JOB: None
                 ACK_JOB_SUBMIT: None
-                ACK_JOB_PREEMPT: None
-                SUBMITTED_JOB_COMPLETION: None
+                ACK_PREEMPTED_None
+                SUBMITTED_JOB_COMPLETION: Generated log file
                 ACK_SUBMITTED_JOB_COMPLETION: None
                 ACK_EXECUTING_JOB_COMPLETION: None
     """
