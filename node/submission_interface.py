@@ -1,3 +1,14 @@
+"""This module is responsible for handling user interactions for job
+    submission and status queries.
+
+    This module's code is run as a forked child of the process running the
+    __main__.py module's code.
+
+    It's main job is take input through a prompt, perform command parsing,
+    and display corresponding content, and in case of job submission, prepare
+    the files for submission and notify parent process through shared memory.
+    
+"""
 import sys
 import os
 import pickle
