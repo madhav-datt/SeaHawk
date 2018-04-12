@@ -5,19 +5,17 @@ import pickle
 import subprocess
 
 from messaging import messageutils
-from network_params import CLIENT_SEND_PORT
+from network_params import CLIENT_SEND_PORT, CLIENT_RECV_PORT, LOCAL_IP
 
 JOB_PICKLE_FILE = '/job.pickle'
 
 
-def execute_job(current_job, execution_dst, current_job_directory,
-                server_ip):
+def execute_job(current_job, execution_dst, current_job_directory):
     """Execute the executable file, and send submission results to server_ip
 
     :param current_job: job object, to be executed
     :param execution_dst: str, path to executable file
     :param current_job_directory: str, directory storing job's files
-    :param server_ip: str, ip address of server
     :return: None
 
     """
@@ -58,12 +56,12 @@ def execute_job(current_job, execution_dst, current_job_directory,
         with open(job_pickle_file, 'wb') as _handle:
             pickle.dump(current_job, _handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        # Prepare and send executed job information message to server
-        messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
+        # Prepare and send executed job information message to parent
+        messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
                                            content=current_job,
-                                           file_path=None, to=server_ip,
+                                           file_path=None, to=LOCAL_IP,
                                            msg_socket=None,
-                                           port=CLIENT_SEND_PORT)
+                                           port=CLIENT_RECV_PORT)
 
         # Gracefully exit
         os._exit(0)
@@ -93,8 +91,8 @@ def execute_job(current_job, execution_dst, current_job_directory,
     with open(job_pickle_file, 'wb') as handle:
         pickle.dump(current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # Prepare and send job completion message to server
-    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
+    # Prepare and send job completion message to parent
+    messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
                                        content=current_job,
-                                       file_path=None, to=server_ip,
+                                       file_path=None, to=LOCAL_IP,
                                        msg_socket=None, port=CLIENT_SEND_PORT)
