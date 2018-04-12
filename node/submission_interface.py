@@ -5,6 +5,9 @@ import shutil
 
 from job import jobfile_parser
 
+JOB_PICKLE_FILE = '/job.pickle'
+SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
+
 
 def run_submission_interface(newstdin, shared_job_array,
                              shared_submitted_jobs_array,
@@ -183,13 +186,13 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
             return False
 
         # Make empty directory to store job object pickle & executable
-        current_job_directory = './job' + str(job_id)
+        current_job_directory = SUBMITTED_JOB_DIRECTORY_PREFIX + str(job_id)
         # Race conditions, but not a problem with current application
         if not os.path.exists(current_job_directory):
             os.makedirs(current_job_directory)
 
         # Make job pickle, save in the job directory as 'job.pickle'
-        job_object_path = current_job_directory + '/job.pickle'
+        job_object_path = current_job_directory + JOB_PICKLE_FILE
         with open(job_object_path, 'wb') as handle:
             pickle.dump(
                 current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -204,7 +207,7 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
                         job_executable_dst_path)
 
         # Set the flag in shared memory
-        shared_job_array[num_created_jobs] = True
+        shared_job_array[job_id] = True
 
         # Return successful submission
         return True
