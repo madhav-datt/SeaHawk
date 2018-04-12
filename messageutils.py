@@ -6,7 +6,7 @@ import pickle
 import psutil
 import socket
 
-from . import message
+import message
 
 BUFFER_SIZE = 1048576
 PORT = 5005
