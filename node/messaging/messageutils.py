@@ -7,8 +7,8 @@ import psutil
 import socket
 
 from . import message
+from .network_params import BUFFER_SIZE
 
-BUFFER_SIZE = 1048576
 PORT = 5005
 
 

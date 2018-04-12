@@ -6,13 +6,14 @@
 
 """
 import os
-import time
-import signal
 import pickle
+import signal
 import subprocess
+import time
 
 from messaging import messageutils
-from network_params import CLIENT_SEND_PORT, CLIENT_RECV_PORT, LOCAL_IP
+from messaging.network_params import CLIENT_SEND_PORT, CLIENT_RECV_PORT, \
+    LOCAL_IP
 
 JOB_PICKLE_FILE = '/job.pickle'
 
