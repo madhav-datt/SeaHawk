@@ -14,10 +14,11 @@ import os
 import pickle
 import shutil
 
-from job import jobfile_parser
+from .job import jobfile_parser
 
 JOB_PICKLE_FILE = '/job.pickle'
 SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
+PROMPT_WELCOME_FILENAME = '/prompt_welcome'
 
 
 def run_submission_interface(newstdin, shared_job_array,
@@ -88,7 +89,9 @@ def run_submission_interface(newstdin, shared_job_array,
 
 def print_welcome_message():
     """Print a welcome message read from prompt_welcome file to stdout"""
-    with open('prompt_welcome', 'r') as file:
+    prompt_welcome_filepath = \
+        os.path.dirname(os.path.realpath(__file__)) + PROMPT_WELCOME_FILENAME
+    with open(prompt_welcome_filepath, 'r') as file:
         print(file.read())
 
 

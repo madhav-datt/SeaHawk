@@ -72,11 +72,11 @@ import sys
 import time
 from ctypes import c_bool
 
-import message_handlers
-import submission_interface
-from messaging import messageutils
-from messaging.message import Message
-from messaging.network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, \
+from . import message_handlers
+from . import submission_interface
+from .messaging import messageutils
+from .messaging.message import Message
+from .messaging.network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, \
     BUFFER_SIZE, CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
