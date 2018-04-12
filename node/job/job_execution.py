@@ -1,3 +1,10 @@
+"""This module's code is responsible for executing a job, and handling
+    it's preemption.
+
+    The function execute_job is run as a child process of the process running
+    the __main__.py module's code.
+
+"""
 import os
 import time
 import signal

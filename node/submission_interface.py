@@ -7,7 +7,7 @@
     It's main job is take input through a prompt, perform command parsing,
     and display corresponding content, and in case of job submission, prepare
     the files for submission and notify parent process through shared memory.
-    
+
 """
 import sys
 import os
