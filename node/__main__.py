@@ -60,7 +60,7 @@
             sends SUBMITTED_JOB_COMPLETION to submitting node
 
     * TODO
-        - None
+        - Make backup ip required in arg parse.
 
 """
 import sys
