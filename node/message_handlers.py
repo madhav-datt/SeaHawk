@@ -5,11 +5,11 @@ Includes handlers for:
     * Acknowledgement of job submission from server
     * Job execution request from server
     * Job preemption request from server
+    * Job execution completion message from child executing the job
+    * Acknowledgement of job execution message from server
     * Submitted job completion message from server
     * Server crash message from child executing crash detection
 
-TODO:
-    * Move send_message functions to messageutils.py
 
 """
 import os
@@ -45,25 +45,8 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
     for itr in range(len(shared_job_array)):
 
         if shared_job_array[itr] and not shared_submitted_jobs_array[itr]:
-
-            # Get job object from pickle
-            job_description_filename = '%s%d%s' \
-                                       % (SUBMITTED_JOB_DIRECTORY_PREFIX, itr,
-                                          JOB_PICKLE_FILE)
-            with open(job_description_filename, 'rb') as handle:
-                current_job = pickle.load(handle)
-
-            # Get job executable filepath
-            job_executable_filename = \
-                '%s%d%s' % (SUBMITTED_JOB_DIRECTORY_PREFIX, itr,
-                            current_job.get_executable_name())
-
-            # Make job submission message, with content as current job object,
-            # file_path as the executable file path. Send to server
-            messageutils.make_and_send_message(
-                msg_type='JOB_SUBMIT', content=current_job,
-                file_path=job_executable_filename, to=server_ip,
-                msg_socket=None, port=CLIENT_SEND_PORT)
+            # Submit job to server
+            submit_job(job_id=itr, server_ip=server_ip)
 
             # Update shared_submitted_jobs_array
             shared_submitted_jobs_array[itr] = True
@@ -88,12 +71,11 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
     shared_acknowledged_jobs_array[ack_job_id] = True
 
 
-def job_exec_msg_handler(msg, execution_jobs_pid_dict, server_ip):
+def job_exec_msg_handler(msg, execution_jobs_pid_dict):
     """Fork a process to execute the job
 
     :param msg: message, received message of 'JOB_EXEC' msg_type
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
-    :param server_ip: str, ip address of server
     :return: None
 
     """
@@ -117,76 +99,82 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict, server_ip):
     if child_pid == 0:
         # Child process
         job_execution.execute_job(current_job, execution_dst,
-                                  current_job_directory,
-                                  server_ip)
+                                  current_job_directory)
     else:
         # Parent process
         os.waitpid(child_pid, 0)
         execution_jobs_pid_dict[current_job.receipt_id] = child_pid
 
 
-def job_preemption_msg_handler(msg, execution_jobs_pid_dict, server_ip):
+def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
+                               executed_jobs_receipt_ids, server_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
     :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
+    :param executed_jobs_receipt_ids: set, receipt ids of jobs that are
+        done executing
     :param server_ip: str, id address of server
     :return: None
 
     """
     job_receipt_id = msg.content
 
-    # Get process id of child that executed/is executing this job
-    executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
+    if job_receipt_id in executed_jobs_receipt_ids:
+        # Duplicate message, just resend job information
+        resend_executed_job_msg(job_receipt_id, server_ip)
+    else:
+        # Get process id of child that executed/is executing this job
+        executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
 
-    # Send kill signal to child, which will be handled via sigint_handler
-    # sigint_handler will send EXECUTED_JOB to central server
-    try:
-        os.kill(executing_child_pid, signal.SIGINT)
-    except OSError as err:
-        if err.errno == errno.ESRCH:
-            # ESRCH: child process no longer exists
-            # This implies that either this job was preempted, and this
-            # preemption message is a duplicate from switched server, or
-            # the process already completed and server didn't receive
-            # completion message before sending preempt request, or the servers
-            # switched. In any case, we resend the EXECUTED_JOB msg for safety.
-
-            # Get job object from it's local directory
-            job_pickle_file = EXECUTING_JOB_DIRECTORY_PREFIX + \
-                              str(job_receipt_id) + JOB_PICKLE_FILE
-
-            with open(job_pickle_file, 'rb') as handle:
-                current_job = pickle.load(handle)
-
-            # Prepare and send executed job information message to server
-            messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
-                                               content=current_job,
-                                               file_path=None, to=server_ip,
-                                               msg_socket=None,
-                                               port=CLIENT_SEND_PORT)
+        # Send kill signal to child, which will be handled via sigint_handler
+        # sigint_handler will send EXECUTED_JOB to central server
+        try:
+            os.kill(executing_child_pid, signal.SIGINT)
+        except OSError as err:
+            if err.errno == errno.ESRCH:
+                # ESRCH: child process no longer exists
+                # This implies that either this job was preempted, and this
+                # preemption message is a duplicate from switched server, or
+                # the process already completed and server didn't receive
+                # completion message before sending preempt request,
+                # or the servers switched. In any case,
+                # we resend the EXECUTED_JOB msg for safety.
+                # Ideally, it should be not be possible to come to this section
+                # due to initial check on executed_jobs_receipt_ids
+                resend_executed_job_msg(job_receipt_id, server_ip)
+        finally:
+            # Only for safety, not really required.
+            executed_jobs_receipt_ids.add(job_receipt_id)
 
 
-def resend_executed_job_msg(job_receipt_id, server_ip):
-    """Helper function for job_preemption_msg_handler
+def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
+                                       server_ip):
+    """Handle message from child signifying an executed job
 
-    Loads job pickle into job object and sends EXECUTED_JOB msg to server
+    The message is simply forwarded to server, with updates to book-keeping set
 
-    :param job_receipt_id: int, receipt id of job
-    :param server_ip: str, server's ip address
+    :param msg: message, received from child process executing the job
+    :param executed_jobs_receipt_ids: set, receipt ids of jobs that are
+        done executing
+    :param server_ip: str, ip address of server
 
     """
-    # Load job object into current_job
-    job_pickle_file = '%s%d%s' % (EXECUTING_JOB_DIRECTORY_PREFIX,
-                                  job_receipt_id, JOB_PICKLE_FILE)
-    with open(job_pickle_file, 'rb') as handle:
-        current_job = pickle.load(handle)
+    executed_jobs_receipt_ids.add(msg.content.receipt_id)
+    messageutils.send_message(msg=msg, to=server_ip, msg_socket=None,
+                              port=CLIENT_SEND_PORT)
 
-    # Resend message to server
-    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
-                                       content=current_job, file_path=None,
-                                       to=server_ip, msg_socket=None,
-                                       port=CLIENT_SEND_PORT)
+
+def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
+    """Handle the acknowledgement message of EXECUTED_JOB msg.
+
+    :param msg: message, received ack message from server
+    :param ack_executed_jobs_receipt_ids: set, receipt ids of jobs that have
+        executed on this system and have received ack from server
+
+    """
+    job_receipt_id = msg.content
+    ack_executed_jobs_receipt_ids.add(job_receipt_id)
 
 
 def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
@@ -221,18 +209,107 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
                                        msg_socket=None, port=CLIENT_SEND_PORT)
 
 
-def server_crash_msg_handler(server_ip, backup_ip):
+def server_crash_msg_handler(shared_submitted_jobs_array,
+                             shared_acknowledged_jobs_array,
+                             executed_jobs_receipt_ids,
+                             ack_executed_jobs_receipt_ids, server_ip):
     """Handle a message recvd from server fault detecting child process about
     an assumed server crash at server_ip
 
-    :param server_ip: str, current server's ip, assumed to have crashed
-    :param backup_ip: str, backup server's ip
-    :return: (str, str), new server ip, new backup ip
+    :param shared_submitted_jobs_array: mp.Array with type int,
+        contains submission id of jobs
+    :param shared_acknowledged_jobs_array: mp.Array, acknowledged submitted jobs
+    :param executed_jobs_receipt_ids: set, receipt ids of executed jobs
+    :param ack_executed_jobs_receipt_ids: set, receipt ids of acknowledged
+        executed jobs
+    :param server_ip: str, ip address of server
 
     """
-    # switch primary and backup server ips
-    server_ip, backup_ip = backup_ip, server_ip
+    # Replay all non-ack messages
+    replay_non_ack_msgs(shared_submitted_jobs_array,
+                        shared_acknowledged_jobs_array,
+                        executed_jobs_receipt_ids,
+                        ack_executed_jobs_receipt_ids, server_ip)
     # send first heartbeat to new primary server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
-    # return the switched primary and server ips
-    return backup_ip, server_ip
+
+
+# Helper Functions
+
+def submit_job(job_id, server_ip):
+    """Helper function to heartbeat_msg_handler, submit job to server
+
+    :param job_id: int, submission id of job
+    :param server_ip: str, ip address of server
+
+    """
+    # Get job object from pickle
+    job_description_filename = '%s%d%s' \
+                               % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_id,
+                                  JOB_PICKLE_FILE)
+    with open(job_description_filename, 'rb') as handle:
+        current_job = pickle.load(handle)
+
+    # Get job executable filepath
+    job_executable_filename = \
+        '%s%d%s' % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_id,
+                    current_job.get_executable_name())
+
+    # Make job submission message, with content as current job object,
+    # file_path as the executable file path. Send to server
+    messageutils.make_and_send_message(
+        msg_type='JOB_SUBMIT', content=current_job,
+        file_path=job_executable_filename, to=server_ip,
+        msg_socket=None, port=CLIENT_SEND_PORT)
+
+
+def resend_executed_job_msg(job_receipt_id, server_ip):
+    """Helper function for job_preemption_msg_handler
+
+    Loads job pickle into job object and sends EXECUTED_JOB msg to server
+
+    :param job_receipt_id: int, receipt id of job
+    :param server_ip: str, server's ip address
+
+    """
+    # Load job object into current_job
+    job_pickle_file = '%s%d%s' % (EXECUTING_JOB_DIRECTORY_PREFIX,
+                                  job_receipt_id, JOB_PICKLE_FILE)
+    with open(job_pickle_file, 'rb') as handle:
+        current_job = pickle.load(handle)
+
+    # Resend message to server
+    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
+                                       content=current_job, file_path=None,
+                                       to=server_ip, msg_socket=None,
+                                       port=CLIENT_SEND_PORT)
+
+
+def replay_non_ack_msgs(shared_submitted_jobs_array,
+                        shared_acknowledged_jobs_array,
+                        executed_jobs_receipt_ids,
+                        ack_executed_jobs_receipt_ids, server_ip):
+    """Send all non ack messages to server.
+
+    Use the book-keeping arrays and sets to find the non ack messages
+
+    :param shared_submitted_jobs_array: mp.Array with type int,
+        contains submission id of jobs
+    :param shared_acknowledged_jobs_array: mp.Array, acknowledged submitted jobs
+    :param executed_jobs_receipt_ids: set, receipt ids of executed jobs
+    :param ack_executed_jobs_receipt_ids: set, receipt ids of acknowledged
+        executed jobs
+    :param server_ip: str, id address of server
+
+    """
+    for itr, elem in enumerate(shared_submitted_jobs_array):
+        if elem and not shared_acknowledged_jobs_array[itr]:
+            # Non acknowledged job submission, resend job
+            submit_job(job_id=itr, server_ip=server_ip)
+
+    non_ack_executing_jobs = \
+        executed_jobs_receipt_ids - ack_executed_jobs_receipt_ids
+
+    for receipt_id in non_ack_executing_jobs:
+        # Non acknowledged executed job msg, resend message
+        resend_executed_job_msg(job_receipt_id=receipt_id, server_ip=server_ip)
