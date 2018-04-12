@@ -76,13 +76,11 @@ import message_handlers
 import submission_interface
 from messaging import messageutils
 from messaging.message import Message
-from network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, BUFFER_SIZE
-
+from network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, BUFFER_SIZE, \
+    CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
 JOB_ARRAY_SIZE = 50
-# Time (in seconds) after which it's assumed that server has crashed
-CRASH_ASSUMPTION_TIME = 10
 
 
 def detect_server_crash(shared_last_heartbeat_recv_time):
