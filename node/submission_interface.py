@@ -82,6 +82,10 @@ def run_submission_interface(newstdin, shared_job_array,
                          shared_acknowledged_jobs_array,
                          shared_completed_jobs_array)
 
+        elif command_type == 'QUIT':
+            # noinspection PyProtectedMember
+            os._exit(0)
+
         elif command_type == 'IMPROPER COMMAND':
             # Print error message for given command
             print_error_message(command)
@@ -109,7 +113,8 @@ def print_help_message():
     """Text to display on "help" command"""
     print("\nUse:\n"
           "1)\"submit <path_to_jobfile>\" for job submission\n"
-          "2)\"status\" to get status of all submitted jobs")
+          "2)\"status\" to get status of all submitted jobs\n"
+          "3)\"quit\" to exit SeaHawk.")
 
 
 def print_status(shared_job_array, shared_submitted_jobs_array,
@@ -158,6 +163,8 @@ def command_parser(command):
         return 'HELP', ()
     elif command == "status":
         return 'STATUS', ()
+    elif command == "quit":
+        return 'QUIT', ()
     elif command.startswith("submit"):
         command_parts = command.split()
         if len(command_parts) != 2:
