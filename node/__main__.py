@@ -14,7 +14,8 @@
             Content of the message contains current system resources' status.
             
         - EXECUTED_JOB: Sent to server on either completing a job execution
-            (in this case, sent by the job execution child process), or on
+            (EXECUTED_JOB_TO_PARENT received from child, which is forwarded
+            as EXECUTED_JOB to server), or on
             receiving a JOB_PREEMPT message from server, this main process
             carries out  the preemption procedure, and sends an
             EXECUTED_JOB message to the server, with updated job object
@@ -28,14 +29,14 @@
         - ACK_SUBMITTED_JOB_COMPLETION: Sent on receiving
             SUBMITTED_JOB_COMPLETION from server. Content field has receipt id.
 
-    Message sent to server by a child:
-        - EXECUTED_JOB: As explained before, sent by execute_job() function
-            in job_execution.py
-
     Messages received from child processes:
         - SERVER_CRASH: The child process detects missing heartbeat message
             for a long time, and sends SERVER_CRASH message to this
             main process.
+
+        - EXECUTED_JOB_TO_PARENT: The child process sends this message to
+            parent on either job completion or preemption. This process (parent)
+            should then forward it as EXECUTED_JOB to the server.
 
     Messages received from server:
         - HEARTBEAT: Server sends this message in response to HEARTBEAT message
@@ -59,22 +60,22 @@
             sends SUBMITTED_JOB_COMPLETION to submitting node
 
     * TODO
-        - When server crash detected, send all non-ack messages
-        - For above, need to maintain executed_job msgs sent and acknowledged
+        - None
 
 """
 import sys
 import time
-import argparse
 import pickle
 import socket
 import os.path
+import argparse
 import multiprocessing as mp
 from ctypes import c_bool
 
 import message_handlers
 import submission_interface
 from messaging import messageutils
+from messaging.message import Message
 from network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, BUFFER_SIZE
 
 
@@ -160,6 +161,10 @@ def main():
     shared_acknowledged_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
+    # Set to store all executed and acknowledged executed jobs' receipt ids
+    executed_jobs_receipt_ids = set()
+    ack_executed_jobs_receipt_ids = set()
+
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = {}
     num_execution_jobs_recvd = 0
@@ -185,15 +190,30 @@ def main():
     # Starting server crash detection process
     process_server_crash_detection.start()
 
+    # Start listening to incoming connections on CLIENT_RECV_PORT.
+    # Server and child processes connect to this socket
     msg_socket = socket.socket()
     msg_socket.bind(('', CLIENT_RECV_PORT))
     msg_socket.listen(5)
+
+    # Send first heartbeat to server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
 
-    connection, client_address = msg_socket.accept()
     while True:
+        # Accept an incoming connection
+        connection, client_address = msg_socket.accept()
+
+        # Receive the data
+        data_list = []
         data = connection.recv(BUFFER_SIZE)
+        while data:
+            data_list.append(data)
+            data = connection.recv(BUFFER_SIZE)
+        data = b''.join(data_list)
+
         msg = pickle.loads(data)
+        assert isinstance(msg, Message), "Received object on socket not of" \
+                                         "type Message."
 
         # TODO: Add condition: 'and msg.msg_type != 'I AM NEW SERVER' if needed
         if msg.sender != server_ip:
@@ -214,22 +234,35 @@ def main():
         elif msg.msg_type == 'JOB_EXEC':
             # TODO: See if num_execution_jobs_recvd is useful anywhere
             num_execution_jobs_recvd += 1
-            message_handlers.job_exec_msg_handler(msg, server_ip,
-                                                  execution_jobs_pid_dict)
+            message_handlers.job_exec_msg_handler(msg, execution_jobs_pid_dict)
 
         elif msg.msg_type == 'JOB_PREEMPT':
             message_handlers.job_preemption_msg_handler(
-                msg, execution_jobs_pid_dict, server_ip)
+                msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
+                server_ip)
+
+        elif msg.msg_type == 'EXECUTED_JOB_TO_PARENT':
+            message_handlers.executed_job_to_parent_msg_handler(
+                msg, executed_jobs_receipt_ids, server_ip)
+
+        elif msg.msg_type == 'ACK_EXECUTED_JOB':
+            message_handlers.ack_executed_job_msg_handler(
+                msg, ack_executed_jobs_receipt_ids)
 
         elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
             message_handlers.submitted_job_completion_msg_handler(
                 msg, shared_completed_jobs_array, server_ip)
 
         elif msg.msg_type == 'SERVER_CRASH':
-            server_ip, backup_ip = message_handlers.server_crash_msg_handler(
-                server_ip, backup_ip)
+            # switch primary and backup server ips
+            server_ip, backup_ip = backup_ip, server_ip
+            message_handlers.server_crash_msg_handler(
+                shared_submitted_jobs_array,
+                shared_acknowledged_jobs_array,
+                executed_jobs_receipt_ids, ack_executed_jobs_receipt_ids,
+                server_ip)
 
-        # TODO: Is this correct?
+        # TODO: Can put condition that if address=server_ip, don't close
         connection.close()
 
 
