@@ -130,7 +130,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
         if shared_job_array[id_num]:
             total_received_jobs += 1
             print('%-10s%-15s%-15s%-15s'
-                  % (id_num + 1,
+                  % (id_num,
                      yn_map(shared_submitted_jobs_array[id_num]),
                      yn_map(shared_acknowledged_jobs_array[id_num]),
                      yn_map(shared_completed_jobs_array[id_num]),))
