@@ -1,15 +1,18 @@
 """Script to run central server.
+
+Responsible for communication with computing nodes, primary backup, job
+scheduling, load balancing, job-node matchmaking decisions etc.
 """
 
 import argparse
-import matchmaking
-import messageutils
 import pickle
-import priorityqueue
 import select
 import socket
 import sys
-import time
+
+from . import message_handlers
+from . import matchmaking
+from .utils import priorityqueue
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
@@ -19,29 +22,6 @@ compute_nodes = {}
 node_list = []
 job_queue = priorityqueue.JobQueue()
 wait_queue = []
-
-
-def heartbeat_handler(received_msg):
-    """Handler function for HEARTBEAT messages.
-
-    :param received_msg: message, received message.
-    """
-
-    compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
-    compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
-    compute_nodes[received_msg.sender]['last_seen'] = time.time()
-
-    # Send heartbeat message to computing node
-    messageutils.send_heartbeat(to=received_msg.sender, port=SERVER_SEND_PORT)
-
-
-def job_submit_handler(received_msg):
-    """Handler function for JOB_SUBMIT messages.
-
-    :param received_msg: message, received message.
-    """
-
-    pass
 
 
 def main():
@@ -103,9 +83,9 @@ def main():
                     msg = pickle.loads(data)
 
                     if msg.msg_type == 'HEARTBEAT':
-                        heartbeat_handler(msg)
+                        message_handlers.heartbeat_handler(compute_nodes, msg)
                     elif msg.msg_type == 'JOB_SUBMIT':
-                        job_submit_handler(msg)
+                        message_handlers.job_submit_handler(msg)
 
                 else:
                     print(sys.stderr, 'closing', client_address,
