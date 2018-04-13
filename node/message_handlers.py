@@ -20,6 +20,7 @@ import time
 from .job import job_execution
 from .messaging import messageutils
 from .messaging.network_params import CLIENT_SEND_PORT
+from .messaging.network_params import CRASH_ASSUMPTION_TIME
 
 SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
 EXECUTING_JOB_DIRECTORY_PREFIX = './exec_job'
@@ -37,7 +38,6 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
     :param server_ip: str, ip address of server
     :return: float, heartbeat receive time
     """
-
     # Record receive time of heartbeat message
     heartbeat_recv_time = time.time()
 
@@ -65,7 +65,6 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
         submission has been acknowledged by server
     :return: None
     """
-
     ack_job_id = msg.submission_id
     shared_acknowledged_jobs_array[ack_job_id] = True
 
@@ -77,7 +76,6 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict):
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
     :return: None
     """
-
     # Get the job object
     current_job = msg.content
 
@@ -116,7 +114,6 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     :param server_ip: str, id address of server
     :return: None
     """
-
     job_receipt_id = msg.content
 
     if job_receipt_id in executed_jobs_receipt_ids:
@@ -158,7 +155,6 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
         done executing
     :param server_ip: str, ip address of server
     """
-
     executed_jobs_receipt_ids.add(msg.content.receipt_id)
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
@@ -171,7 +167,6 @@ def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
     :param ack_executed_jobs_receipt_ids: set, receipt ids of jobs that have
         executed on this system and have received ack from server
     """
-
     job_receipt_id = msg.content
     ack_executed_jobs_receipt_ids.add(job_receipt_id)
 
@@ -186,7 +181,6 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
         jobs
     :param server_ip: str, id address of server
     """
-
     # Get the job object from message's content field
     current_job = msg.content
 
@@ -225,15 +219,16 @@ def server_crash_msg_handler(shared_submitted_jobs_array,
     :param ack_executed_jobs_receipt_ids: set, receipt ids of acknowledged
         executed jobs
     :param server_ip: str, ip address of server
-
     """
+    # send first heartbeat to new primary server
+    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+    time.sleep(CRASH_ASSUMPTION_TIME)
+
     # Replay all non-ack messages
     replay_non_ack_msgs(shared_submitted_jobs_array,
                         shared_acknowledged_jobs_array,
                         executed_jobs_receipt_ids,
                         ack_executed_jobs_receipt_ids, server_ip)
-    # send first heartbeat to new primary server
-    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
 
 
 # Helper Functions
@@ -243,7 +238,6 @@ def submit_job(job_id, server_ip):
 
     :param job_id: int, submission id of job
     :param server_ip: str, ip address of server
-
     """
     # Get job object from pickle
     job_description_filename = '%s%d%s' \
@@ -275,7 +269,6 @@ def resend_executed_job_msg(job_receipt_id, server_ip):
 
     :param job_receipt_id: int, receipt id of job
     :param server_ip: str, server's ip address
-
     """
     # Load job object into current_job
     job_pickle_file = '%s%d%s' % (EXECUTING_JOB_DIRECTORY_PREFIX,
@@ -308,7 +301,6 @@ def replay_non_ack_msgs(shared_submitted_jobs_array,
     :param ack_executed_jobs_receipt_ids: set, receipt ids of acknowledged
         executed jobs
     :param server_ip: str, id address of server
-
     """
     for itr, elem in enumerate(shared_submitted_jobs_array):
         if elem and not shared_acknowledged_jobs_array[itr]:
