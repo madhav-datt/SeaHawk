@@ -7,8 +7,8 @@
     It's main job is take input through a prompt, perform command parsing,
     and display corresponding content, and in case of job submission, prepare
     the files for submission and notify parent process through shared memory.
-
 """
+
 import sys
 import os
 import pickle
@@ -29,18 +29,18 @@ def run_submission_interface(newstdin, shared_job_array,
 
     Child process forked from main, with shared data array.
 
-    :param newstdin: stdin file descriptor given by parent
+    :param newstdin: stdin file descriptor given by parent.
     :param shared_job_array: shared boolean array, for signalling submitted
-        jobs to parent
+        jobs to parent.
     :param shared_submitted_jobs_array: shared mp.Array, where idx is set
-        to True if job has been submitted to server
+        to True if job has been submitted to server.
     :param shared_acknowledged_jobs_array: mp.Array, idx set to true if job
-        submission has been acknowledged by server
+        submission has been acknowledged by server.
     :param shared_completed_jobs_array: mp.Array, idx set to true if job has
-        completed execution
+        completed execution.
     :return: None
-
     """
+
     sys.stdin = newstdin
     print_welcome_message()
 
@@ -92,7 +92,9 @@ def run_submission_interface(newstdin, shared_job_array,
 
 
 def print_welcome_message():
-    """Print a welcome message read from prompt_welcome file to stdout"""
+    """Print a welcome message read from prompt_welcome file to stdout.
+    """
+
     prompt_welcome_filepath = \
         os.path.dirname(os.path.realpath(__file__)) + PROMPT_WELCOME_FILENAME
     with open(prompt_welcome_filepath, 'r') as file:
@@ -100,17 +102,19 @@ def print_welcome_message():
 
 
 def print_error_message(command):
-    """Print an error message to stdout in case of improper input command
+    """Print an error message to stdout in case of improper input command.
 
-    :param command: str, unknown command entered by user
-
+    :param command: str, unknown command entered by user.
     """
+
     print('\n%s: command not found\n'
           'Use "help" to see correct command semantics.' % command)
 
 
 def print_help_message():
-    """Text to display on "help" command"""
+    """Text to display on "help" command.
+    """
+
     print("\nUse:\n"
           "1)\"submit <path_to_jobfile>\" for job submission\n"
           "2)\"status\" to get status of all submitted jobs\n"
@@ -119,14 +123,14 @@ def print_help_message():
 
 def print_status(shared_job_array, shared_submitted_jobs_array,
                  shared_acknowledged_jobs_array, shared_completed_jobs_array):
-    """Print the status of all received jobs to terminal
+    """Print the status of all received jobs to terminal.
 
-    :param shared_job_array: mp.Array of type bool
-    :param shared_submitted_jobs_array: mp.Array of type bool
-    :param shared_acknowledged_jobs_array: mp.Array of type bool
-    :param shared_completed_jobs_array: mp.Array of type bool
-
+    :param shared_job_array: mp.Array of type bool.
+    :param shared_submitted_jobs_array: mp.Array of type bool.
+    :param shared_acknowledged_jobs_array: mp.Array of type bool.
+    :param shared_completed_jobs_array: mp.Array of type bool.
     """
+
     total_received_jobs = 0
 
     def yn_map(bool_val):
@@ -149,12 +153,12 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
 
 def command_parser(command):
-    """Parse the input command and return type, and any accompanying arguments
+    """Parse the input command and return type, and any accompanying arguments.
 
-    :param command: str, command input by the user
-    :return: (str, tuple), command type, tuple of accompanying arguments
-
+    :param command: str, command input by the user.
+    :return: (str, tuple), command type, tuple of accompanying arguments.
     """
+
     command = command.strip()
 
     if command == "":
@@ -178,15 +182,15 @@ def command_parser(command):
 
 def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
     """Handle preparation for job submission. Set flag for parent process
-    to check and submit the job
+    to check and submit the job.
 
-    :param command_args: list, arguments from the command line
-    :param num_created_jobs: int, number of jobs that have already been created
+    :param command_args: list, arguments from the command line.
+    :param num_created_jobs: int, number of jobs that have already been created.
     :param shared_job_array: mp.Array of type c_bool, idx set to true if job
-        with that index has already been submitted
+        with that index has already been submitted.
     :return: bool, true for success, false for error/failure to submit.
-
     """
+
     # Handle job submission by reading jobfile path in args
     jobfile_path = command_args[0]
     job_id = num_created_jobs + 1

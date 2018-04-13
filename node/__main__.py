@@ -61,8 +61,8 @@
 
     * TODO
         - Make backup ip required in arg parse.
-
 """
+
 import argparse
 import multiprocessing as mp
 import os.path
@@ -88,8 +88,8 @@ def detect_server_crash(shared_last_heartbeat_recv_time):
 
     :param shared_last_heartbeat_recv_time: shared mp.Value, float type
     :return: None
-
     """
+
     # When a server crash detected, shared_last_heartbeat_recv_time is
     # set to time.time() + reset_time_allowance, to account for reset time.
     reset_time_allowance = 5.
@@ -135,8 +135,8 @@ def main():
     Job submission is handled entirely by a forked child process.
     Job execution is handed partly by this and a forked child process.
     Heartbeat messages are constantly exchanged.
-
     """
+
     # Begin argument parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("-serverip", help="IP address of central server",

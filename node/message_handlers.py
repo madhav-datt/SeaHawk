@@ -9,9 +9,8 @@ Includes handlers for:
     * Acknowledgement of job execution message from server
     * Submitted job completion message from server
     * Server crash message from child executing crash detection
-
-
 """
+
 import errno
 import os
 import pickle
@@ -37,8 +36,8 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         to True if job has been submitted to server
     :param server_ip: str, ip address of server
     :return: float, heartbeat receive time
-
     """
+
     # Record receive time of heartbeat message
     heartbeat_recv_time = time.time()
 
@@ -65,8 +64,8 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
     :param shared_acknowledged_jobs_array: mp.Array, idx set to true if job
         submission has been acknowledged by server
     :return: None
-
     """
+
     ack_job_id = msg.submission_id
     shared_acknowledged_jobs_array[ack_job_id] = True
 
@@ -77,8 +76,8 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict):
     :param msg: message, received message of 'JOB_EXEC' msg_type
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
     :return: None
-
     """
+
     # Get the job object
     current_job = msg.content
 
@@ -98,8 +97,8 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict):
     child_pid = os.fork()
     if child_pid == 0:
         # Child process
-        job_execution.execute_job(current_job, execution_dst,
-                                  current_job_directory)
+        job_execution.execute_job(
+            current_job, execution_dst, current_job_directory)
     else:
         # Parent process
         os.waitpid(child_pid, 0)
@@ -116,8 +115,8 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         done executing
     :param server_ip: str, id address of server
     :return: None
-
     """
+
     job_receipt_id = msg.content
 
     if job_receipt_id in executed_jobs_receipt_ids:
@@ -158,11 +157,11 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
     :param executed_jobs_receipt_ids: set, receipt ids of jobs that are
         done executing
     :param server_ip: str, ip address of server
-
     """
+
     executed_jobs_receipt_ids.add(msg.content.receipt_id)
-    messageutils.send_message(msg=msg, to=server_ip, msg_socket=None,
-                              port=CLIENT_SEND_PORT)
+    messageutils.send_message(
+        msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
 
 
 def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
@@ -171,8 +170,8 @@ def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
     :param msg: message, received ack message from server
     :param ack_executed_jobs_receipt_ids: set, receipt ids of jobs that have
         executed on this system and have received ack from server
-
     """
+
     job_receipt_id = msg.content
     ack_executed_jobs_receipt_ids.add(job_receipt_id)
 
@@ -186,8 +185,8 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
     :param shared_completed_jobs_array: set, submission ids of all completed
         jobs
     :param server_ip: str, id address of server
-
     """
+
     # Get the job object from message's content field
     current_job = msg.content
 
@@ -203,10 +202,13 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
         file.write(msg.file)
 
     # Prepare and send acknowledgement message for completion message
-    messageutils.make_and_send_message(msg_type='ACK_SUBMITTED_JOB_COMPLETION',
-                                       content=current_job.receipt_id,
-                                       file_path=None, to=server_ip,
-                                       msg_socket=None, port=CLIENT_SEND_PORT)
+    messageutils.make_and_send_message(
+        msg_type='ACK_SUBMITTED_JOB_COMPLETION',
+        content=current_job.receipt_id,
+        file_path=None,
+        to=server_ip,
+        msg_socket=None,
+        port=CLIENT_SEND_PORT)
 
 
 def server_crash_msg_handler(shared_submitted_jobs_array,
@@ -258,9 +260,12 @@ def submit_job(job_id, server_ip):
     # Make job submission message, with content as current job object,
     # file_path as the executable file path. Send to server
     messageutils.make_and_send_message(
-        msg_type='JOB_SUBMIT', content=current_job,
-        file_path=job_executable_filename, to=server_ip,
-        msg_socket=None, port=CLIENT_SEND_PORT)
+        msg_type='JOB_SUBMIT',
+        content=current_job,
+        file_path=job_executable_filename,
+        to=server_ip,
+        msg_socket=None,
+        port=CLIENT_SEND_PORT)
 
 
 def resend_executed_job_msg(job_receipt_id, server_ip):
@@ -279,10 +284,13 @@ def resend_executed_job_msg(job_receipt_id, server_ip):
         current_job = pickle.load(handle)
 
     # Resend message to server
-    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
-                                       content=current_job, file_path=None,
-                                       to=server_ip, msg_socket=None,
-                                       port=CLIENT_SEND_PORT)
+    messageutils.make_and_send_message(
+        msg_type='EXECUTED_JOB',
+        content=current_job,
+        file_path=None,
+        to=server_ip,
+        msg_socket=None,
+        port=CLIENT_SEND_PORT)
 
 
 def replay_non_ack_msgs(shared_submitted_jobs_array,

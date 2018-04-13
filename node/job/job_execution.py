@@ -1,10 +1,10 @@
 """This module's code is responsible for executing a job, and handling
-    it's preemption.
+it's preemption.
 
-    The function execute_job is run as a child process of the process running
-    the __main__.py module's code.
-
+The function execute_job is run as a child process of the process running the
+__main__.py module's code.
 """
+
 import os
 import pickle
 import signal
@@ -25,8 +25,8 @@ def execute_job(current_job, execution_dst, current_job_directory):
     :param execution_dst: str, path to executable file
     :param current_job_directory: str, directory storing job's files
     :return: None
-
     """
+
     # Record start time for job, share the variable with sigint_handler
     start_time = time.time()
     # File where updated job object will be stored
@@ -41,8 +41,8 @@ def execute_job(current_job, execution_dst, current_job_directory):
         :param signum: signal number
         :param frame: frame object
         :return: None
-
         """
+
         preemption_end_time = time.time()
 
         # Update job run time, completion status

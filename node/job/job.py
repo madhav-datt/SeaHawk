@@ -25,8 +25,8 @@ class Job:
         execution_list: list, containing tuple elements
             (executing machine name, time_run) for each machine that executes
             this job
-
     """
+
     def __init__(self, name, executable, priority, time_required, min_memory,
                  min_cores, max_memory):
         """Initializes job object.
@@ -42,6 +42,7 @@ class Job:
             execution
 
         """
+
         self.submission_id = None
         self.receipt_id = None
         self.name = name
@@ -61,6 +62,8 @@ class Job:
         self.execution_list = []
 
     def get_executable_name(self):
-        """ Return name of the executable file, by parsing the address."""
+        """ Return name of the executable file, by parsing the address.
+        """
+
         executable_address_partitions = self.executable.split('/')
         return '/' + executable_address_partitions[-1]

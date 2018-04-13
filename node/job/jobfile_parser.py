@@ -14,13 +14,15 @@ def parse_jobfile(jobfile_name):
     :raises: ValueError: Invalid job description file
     """
 
-    job_description_dict = {'name': 'defaultJob',
-                            'executable': None,
-                            'priority': 0,
-                            'time_required': None,
-                            'min_memory': None,
-                            'min_cores': None,
-                            'max_memory': None}
+    job_description_dict = {
+        'name': 'defaultJob',
+        'executable': None,
+        'priority': 0,
+        'time_required': None,
+        'min_memory': None,
+        'min_cores': None,
+        'max_memory': None,
+    }
 
     with open(jobfile_name, "r") as jobfile:
         for line in jobfile:
