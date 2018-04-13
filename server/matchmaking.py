@@ -12,9 +12,9 @@ def matchmaking(job, compute_nodes, running_jobs):
 
     :param job: The job to be scheduled
     :param compute_nodes: Dictionary with cpu usage and memory of each node
-        {nodeId: status}
+        {node_id: status}
     :param running_jobs: Dictionary with jobs running on each system
-        {nodeId: [list of jobs]}
+        {node_id: [list of jobs]}
     :return: (node, job). The node where this job has to be scheduled, and also
         the job that is to be preempted (if any)
     """

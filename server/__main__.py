@@ -20,17 +20,18 @@ import socket
 import sys
 
 from . import message_handlers
-from . import matchmaking
 from .utils import priorityqueue
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
 
-compute_nodes = {}
+compute_nodes = {}  # {node_id: status}
 node_list = []
 job_queue = priorityqueue.JobQueue()
-running_jobs = {}
+running_jobs = {}  # {node_id: [list of jobs]}
+job_executable = {}  # {job_id: executable}
+job_sender = {}  # {job_id: sender}
 
 
 def main():
@@ -97,14 +98,27 @@ def main():
                         # TODO
                         message_handlers.heartbeat_handler(
                             compute_nodes=compute_nodes, received_msg=msg)
+
                     elif msg.msg_type == 'JOB_SUBMIT':
                         job_receipt_id += 1
                         message_handlers.job_submit_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
                             running_jobs=running_jobs,
+                            job_sender=job_sender,
+                            job_executable=job_executable,
                             received_msg=msg,
                             job_receipt_id=job_receipt_id)
+
+                    elif msg.msg_type == 'EXECUTED_JOB':
+                        global job_queue
+                        job_queue = message_handlers.executed_job_handler(
+                            job_queue=job_queue,
+                            compute_nodes=compute_nodes,
+                            running_jobs=running_jobs,
+                            job_sender=job_sender,
+                            job_executable=job_executable,
+                            received_msg=msg)
 
                 else:
                     print(sys.stderr, 'closing', client_address,
