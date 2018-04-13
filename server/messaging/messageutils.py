@@ -5,9 +5,11 @@ import io
 import pickle
 import psutil
 import socket
+import time
 
 from . import message
 
+HEARTBEAT_REPLY_WAIT_SECONDS = 5
 BUFFER_SIZE = 1048576
 PORT = 5005
 
@@ -26,6 +28,19 @@ def make_and_send_message(msg_type, content, file_path, to, msg_socket, port):
     msg = message.Message(msg_type=msg_type, content=content,
                           file_path=file_path)
     send_message(msg=msg, to=to, msg_socket=msg_socket, port=port)
+
+
+def wait_send_heartbeat(to, port):
+    """Wait for a short duration and send heartbeat message.
+
+    Function is run as a forked child process.
+
+    :param to: String with IP address of receiver node
+    :param port: Integer with port to be used for sending/receiving messages.
+    """
+
+    time.sleep(HEARTBEAT_REPLY_WAIT_SECONDS)
+    send_heartbeat(to=to, port=port)
 
 
 def send_message(msg, to, msg_socket=None, port=PORT):

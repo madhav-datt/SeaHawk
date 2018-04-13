@@ -1,9 +1,11 @@
-"""Message handlers for all messages received at server
+"""Message handlers for all messages received at server.
 
 Includes handlers for:
-    * Heartbeat message from server
+    * Heartbeat message from client/compute nodes.
+    * Job submit
 """
 
+import multiprocessing as mp
 import time
 
 from . import matchmaking
@@ -18,17 +20,27 @@ SERVER_RECV_PORT = 5006
 def heartbeat_handler(compute_nodes, received_msg):
     """Handler function for HEARTBEAT messages.
 
-    :param compute_nodes:
+    :param compute_nodes: Dictionary with cpu usage and memory of each node
+        {node_id: status}
     :param received_msg: message, received message.
     """
 
     # Update compute node available resources
+    if received_msg.sender not in compute_nodes:
+        # Node has recovered and needs to be added back to list of nodes
+        compute_nodes[received_msg.sender] = {}
+
     compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
     compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
     compute_nodes[received_msg.sender]['last_seen'] = time.time()
 
     # Send heartbeat message to computing node
-    messageutils.send_heartbeat(to=received_msg.sender, port=SERVER_SEND_PORT)
+    # Creating new process to wait and reply to heartbeat messages
+    process_wait_send_heartbeat = mp.Process(
+        target=messageutils.wait_send_heartbeat,
+        args=(received_msg.sender, SERVER_SEND_PORT, )
+    )
+    process_wait_send_heartbeat.start()
 
 
 def job_submit_handler(job_queue,
@@ -77,7 +89,10 @@ def executed_job_handler(job_queue,
                          job_sender,
                          job_executable,
                          received_msg):
-    """
+    """Handler function for EXECUTED_JOB messages.
+
+    If executed job is complete, tries to schedule all jobs waiting in the
+    job_queue. If executed job was preempted, attempts to reschedule it.
 
     :param job_queue: Priority queue for jobs that could not be scheduled.
     :param compute_nodes: Dictionary with cpu usage and memory of each node
@@ -135,6 +150,12 @@ def executed_job_handler(job_queue,
             running_jobs=running_jobs)
 
     return job_queue
+
+
+def ack_ignore_handler():
+    """Handler function for ACK messages. Ignores received ack messages.
+    """
+    pass
 
 
 # Helper functions

@@ -120,6 +120,15 @@ def main():
                             job_executable=job_executable,
                             received_msg=msg)
 
+                    elif msg.msg_type == 'ACK_JOB_EXEC':
+                        message_handlers.ack_ignore_handler()
+
+                    elif msg.msg_type == 'ACK_JOB_EXEC_PREEMPT':
+                        message_handlers.ack_ignore_handler()
+
+                    elif msg.msg_type == 'ACK_SUBMITTED_JOB_COMPLETION':
+                        message_handlers.ack_ignore_handler()
+
                 else:
                     print(sys.stderr, 'closing', client_address,
                           'after reading no data')
