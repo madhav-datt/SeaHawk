@@ -120,10 +120,13 @@ def detect_server_crash(shared_last_heartbeat_recv_time):
             # Make and send a crash message to main process which is listening
             # on CLIENT_RECV_PORT for incoming messages
             # TODO: Check if 'to' needs to be changed to socket.gethostname()
-            messageutils.make_and_send_message(msg_type='SERVER_CRASH',
-                                               content=None, file_path=None,
-                                               to='127.0.0.1', msg_socket=None,
-                                               port=CLIENT_RECV_PORT)
+            messageutils.make_and_send_message(
+                msg_type='SERVER_CRASH',
+                content=None,
+                file_path=None,
+                to='127.0.0.1',
+                msg_socket=None,
+                port=CLIENT_RECV_PORT)
 
             # Reset sleep time to the time for reset allowance
             sleep_time = reset_time_allowance
@@ -187,7 +190,7 @@ def main():
 
     # Creating new process for server crash detection
     process_server_crash_detection = mp.Process(
-        target=detect_server_crash, args=(shared_last_heartbeat_recv_time, )
+        target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
     )
 
     # Starting server crash detection process

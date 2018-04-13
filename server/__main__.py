@@ -14,17 +14,22 @@
 """
 
 import argparse
+import multiprocessing as mp
 import pickle
 import select
 import socket
 import sys
+import time
 
 from . import message_handlers
+from .messaging import messageutils
 from .utils import priorityqueue
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
+CRASH_ASSUMPTION_TIME = 20  # seconds
+CRASH_DETECTOR_SLEEP_TIME = 2  # seconds
 
 compute_nodes = {}  # {node_id: status}
 node_list = []
@@ -34,8 +39,39 @@ job_executable = {}  # {job_id: executable}
 job_sender = {}  # {job_id: sender}
 
 
-def main():
+def detect_node_crash(node_last_seen):
+    """Detects node crashes.
 
+    Run as a child process, periodically checking last heartbeat times for each
+    computing node.
+
+    :param node_last_seen: Dictionary with time when last heartbeat was
+        received from node {node_id: last_seen_time}
+    """
+
+    while True:
+        time.sleep(CRASH_DETECTOR_SLEEP_TIME)
+
+        current_time = time.time()
+        crashed_nodes = set()
+        for node_id, last_seen_time in node_last_seen.items():
+            time_since_last_heartbeat = current_time - last_seen_time
+            if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
+                crashed_nodes.add(node_id)
+
+        # Make and send a crash message to main process which is listening
+        # on SERVER_RECV_PORT for incoming messages.
+        # TODO: Check if 'to' needs to be changed to socket.gethostname()
+        if len(crashed_nodes) != 0:
+            messageutils.make_and_send_message(msg_type='NODE_CRASH',
+                                               content=crashed_nodes,
+                                               file_path=None,
+                                               to='127.0.0.1',
+                                               msg_socket=None,
+                                               port=SERVER_RECV_PORT)
+
+
+def main():
     parser = argparse.ArgumentParser(description='Set up central server.')
     parser.add_argument(
         '--ip', required=True, help='IP address of central server (this node).')
@@ -47,16 +83,23 @@ def main():
     args = parser.parse_args()
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
+    manager = mp.Manager()
+    node_last_seen = manager.dict()  # {node_id: last_seen_time}
 
     with open(args.node_file) as nodes_ip_file:
         for node_ip in nodes_ip_file:
             ip_address, total_memory = node_ip[:-1].split(',')
             running_jobs[ip_address] = []
             node_list.append(ip_address)
+            node_last_seen[ip_address] = None
             compute_nodes[ip_address] = {
                 'cpu': None, 'memory': None, 'last_seen': None,
                 'total_memory': total_memory,
             }
+
+    process_crash_detector = mp.Process(
+        target=detect_node_crash, args=(node_last_seen,))
+    process_crash_detector.start()
 
     # Creates a TCP/IP socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -95,9 +138,10 @@ def main():
                     msg = pickle.loads(data)
 
                     if msg.msg_type == 'HEARTBEAT':
-                        # TODO
                         message_handlers.heartbeat_handler(
-                            compute_nodes=compute_nodes, received_msg=msg)
+                            compute_nodes=compute_nodes,
+                            node_last_seen=node_last_seen,
+                            received_msg=msg)
 
                     elif msg.msg_type == 'JOB_SUBMIT':
                         job_receipt_id += 1
@@ -128,6 +172,14 @@ def main():
 
                     elif msg.msg_type == 'ACK_SUBMITTED_JOB_COMPLETION':
                         message_handlers.ack_ignore_handler()
+
+                    elif msg.msg_type == 'NODE_CRASH':
+                        message_handlers.node_crash_handler(
+                            received_msg=msg,
+                            compute_nodes=compute_nodes,
+                            running_jobs=running_jobs,
+                            job_queue=job_queue,
+                            job_executable=job_executable)
 
                 else:
                     print(sys.stderr, 'closing', client_address,

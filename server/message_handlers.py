@@ -5,6 +5,7 @@ Includes handlers for:
     * Job submit
 """
 
+import copy
 import multiprocessing as mp
 import time
 
@@ -17,11 +18,13 @@ SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 
 
-def heartbeat_handler(compute_nodes, received_msg):
+def heartbeat_handler(compute_nodes, node_last_seen, received_msg):
     """Handler function for HEARTBEAT messages.
 
     :param compute_nodes: Dictionary with cpu usage and memory of each node
         {node_id: status}
+    :param node_last_seen: Dictionary with time when last heartbeat was
+        received from node {node_id: last_seen_time}
     :param received_msg: message, received message.
     """
 
@@ -33,6 +36,8 @@ def heartbeat_handler(compute_nodes, received_msg):
     compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
     compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
     compute_nodes[received_msg.sender]['last_seen'] = time.time()
+    node_last_seen[received_msg.sender] = \
+        compute_nodes[received_msg.sender]['last_seen']
 
     # Send heartbeat message to computing node
     # Creating new process to wait and reply to heartbeat messages
@@ -156,6 +161,44 @@ def ack_ignore_handler():
     """Handler function for ACK messages. Ignores received ack messages.
     """
     pass
+
+
+def node_crash_handler(compute_nodes,
+                       running_jobs,
+                       job_queue,
+                       job_executable,
+                       received_msg):
+    """Handler function for NODE_CRASH messages.
+
+    Message received from child process of server. Reschedules all jobs that
+    were being executed on crashed nodes. Removes crashed nodes from the
+    compute_nodes dictionary.
+
+    :param job_queue: Priority queue for jobs that could not be scheduled.
+    :param compute_nodes: Dictionary with cpu usage and memory of each node
+        {node_id: status}
+    :param running_jobs: Dictionary with jobs running on each system
+        {node_id: [list of jobs]}
+    :param job_executable: Dictionary with job executables {job_id: executable}
+    :param received_msg: message, received message.
+    """
+
+    crashed_nodes = received_msg.content
+    pre_crash_running_jobs = copy.deepcopy(running_jobs)
+
+    for node_id in crashed_nodes:
+        del compute_nodes[node_id]
+        del running_jobs[node_id]
+
+    for node_id, running_jobs_list in pre_crash_running_jobs.items():
+        if node_id in crashed_nodes:
+            for job in running_jobs_list:
+                schedule_and_send_job(
+                    job=job,
+                    executable=job_executable[job.receipt_id],
+                    job_queue=job_queue,
+                    compute_nodes=compute_nodes,
+                    running_jobs=running_jobs)
 
 
 # Helper functions

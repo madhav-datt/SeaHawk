@@ -18,7 +18,8 @@ class Message(object):
                 ACK_JOB_SUBMIT: Job submission id, int.
                 ACK_EXECUTED_JOB: Receipt id of job
                 SUBMITTED_JOB_COMPLETION: Job object for the submitted job.
-                ACK_SUBMITTED_JOB_COMPLETION: Receipt id of submitted job
+                ACK_SUBMITTED_JOB_COMPLETION: Receipt id of submitted job.
+                NODE_CRASH: Set of nodes that have crashed.
           sender: String with IP address of sender machine.
           file: Byte string with file contents.
                 Default: None
@@ -31,6 +32,7 @@ class Message(object):
                 ACK_EXECUTED_JOB: None
                 SUBMITTED_JOB_COMPLETION: Generated log file
                 ACK_SUBMITTED_JOB_COMPLETION: None
+                NODE_CRASH: None
     """
 
     def __init__(self, msg_type, content=None, file_path=None, file=None):
