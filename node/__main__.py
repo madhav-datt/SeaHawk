@@ -76,8 +76,10 @@ from . import message_handlers
 from . import submission_interface
 from .messaging import messageutils
 from .messaging.message import Message
-from .messaging.network_params import CLIENT_RECV_PORT, CLIENT_SEND_PORT, \
-    BUFFER_SIZE, CRASH_ASSUMPTION_TIME
+from .messaging.network_params import CLIENT_RECV_PORT
+from .messaging.network_params import CLIENT_SEND_PORT
+from .messaging.network_params import BUFFER_SIZE
+from .messaging.network_params import CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
 JOB_ARRAY_SIZE = 50

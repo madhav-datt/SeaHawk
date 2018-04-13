@@ -21,8 +21,8 @@ def make_and_send_message(msg_type, content, file_path, to, msg_socket, port):
     :param to: str, ip address of destination machine
     :param msg_socket: socket, via which to send the message
     :param port: int, port number on which message should be received
-
     """
+
     msg = message.Message(msg_type=msg_type, content=content,
                           file_path=file_path)
     send_message(msg=msg, to=to, msg_socket=msg_socket, port=port)
