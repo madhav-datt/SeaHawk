@@ -50,11 +50,12 @@
         - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message
 
         - JOB_EXEC: Sent by server requesting execution of a job on the node.
-            Two types of JOB_EXEC messages
             Should have job object in content, and executable in file field.
 
-        - JOB_PREEMPT: Sent by server requesting preemption of an executing
-            job. In
+        - JOB_PREEMPT_EXEC: Sent by server requesting preemption of an executing
+            job, and execution of a new job. Should have (new_job,
+            job_to_preempt receipt id) in content, and executable file of new
+            job in file.
 
         - SUBMITTED_JOB_COMPLETION: Server, on receiving EXECUTED_JOB message
             from a node, checks job's 'completed' attribute, and if True,
@@ -246,9 +247,12 @@ def main():
         elif msg.msg_type == 'JOB_EXEC':
             # TODO: See if num_execution_jobs_recvd is useful anywhere
             num_execution_jobs_recvd += 1
-            message_handlers.job_exec_msg_handler(msg, execution_jobs_pid_dict)
+            message_handlers.job_exec_msg_handler(current_job=msg.content,
+                                                  job_executable=msg.file,
+                                                  execution_jobs_pid_dict=
+                                                  execution_jobs_pid_dict)
 
-        elif msg.msg_type == 'JOB_PREEMPT':
+        elif msg.msg_type == 'JOB_PREEMPT_EXEC':
             message_handlers.job_preemption_msg_handler(
                 msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
                 server_ip)
