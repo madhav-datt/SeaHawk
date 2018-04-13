@@ -246,17 +246,19 @@ def submit_job(job_id, server_ip):
     with open(job_description_filename, 'rb') as handle:
         current_job = pickle.load(handle)
 
-    # Get job executable filepath
+    # Get job executable in bytes
     job_executable_filename = \
         '%s%d%s' % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_id,
                     current_job.get_executable_name())
+    with open(job_executable_filename, 'rb') as handle:
+        job_executable = handle.read()
 
     # Make job submission message, with content as current job object,
     # file_path as the executable file path. Send to server
     messageutils.make_and_send_message(
         msg_type='JOB_SUBMIT',
         content=current_job,
-        file_path=job_executable_filename,
+        file_path=job_executable,
         to=server_ip,
         msg_socket=None,
         port=CLIENT_SEND_PORT)

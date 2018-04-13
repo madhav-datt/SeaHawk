@@ -8,7 +8,6 @@
     and display corresponding content, and in case of job submission, prepare
     the files for submission and notify parent process through shared memory.
 """
-
 import sys
 import os
 import pickle
@@ -39,8 +38,8 @@ def run_submission_interface(newstdin, shared_job_array,
     :param shared_completed_jobs_array: mp.Array, idx set to true if job has
         completed execution.
     :return: None
-    """
 
+    """
     sys.stdin = newstdin
     print_welcome_message()
 
@@ -92,9 +91,7 @@ def run_submission_interface(newstdin, shared_job_array,
 
 
 def print_welcome_message():
-    """Print a welcome message read from prompt_welcome file to stdout.
-    """
-
+    """Print a welcome message read from prompt_welcome file to stdout."""
     prompt_welcome_filepath = \
         os.path.dirname(os.path.realpath(__file__)) + PROMPT_WELCOME_FILENAME
     with open(prompt_welcome_filepath, 'r') as file:
@@ -105,16 +102,14 @@ def print_error_message(command):
     """Print an error message to stdout in case of improper input command.
 
     :param command: str, unknown command entered by user.
-    """
 
+    """
     print('\n%s: command not found\n'
           'Use "help" to see correct command semantics.' % command)
 
 
 def print_help_message():
-    """Text to display on "help" command.
-    """
-
+    """Text to display on "help" command."""
     print("\nUse:\n"
           "1)\"submit <path_to_jobfile>\" for job submission\n"
           "2)\"status\" to get status of all submitted jobs\n"
@@ -129,8 +124,8 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
     :param shared_submitted_jobs_array: mp.Array of type bool.
     :param shared_acknowledged_jobs_array: mp.Array of type bool.
     :param shared_completed_jobs_array: mp.Array of type bool.
-    """
 
+    """
     total_received_jobs = 0
 
     def yn_map(bool_val):
@@ -157,8 +152,8 @@ def command_parser(command):
 
     :param command: str, command input by the user.
     :return: (str, tuple), command type, tuple of accompanying arguments.
-    """
 
+    """
     command = command.strip()
 
     if command == "":
