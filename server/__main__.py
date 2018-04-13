@@ -1,7 +1,16 @@
 """Script to run central server.
 
-Responsible for communication with computing nodes, primary backup, job
-scheduling, load balancing, job-node matchmaking decisions etc.
+    Responsible for communication with computing nodes, primary backup, job
+    scheduling, load balancing, job-node matchmaking decisions etc.
+
+    Messages received from node:
+
+    Messages received from backup:
+
+    Messages sent to node:
+
+    Messages sent to backup:
+
 """
 
 import argparse
@@ -21,7 +30,7 @@ BUFFER_SIZE = 1048576
 compute_nodes = {}
 node_list = []
 job_queue = priorityqueue.JobQueue()
-wait_queue = []
+running_jobs = {}
 
 
 def main():
@@ -36,10 +45,12 @@ def main():
              'client/computing node.')
     args = parser.parse_args()
 
+    job_receipt_id = 0  # Unique ID assigned to each job from server.
+
     with open(args.node_file) as nodes_ip_file:
         for node_ip in nodes_ip_file:
             ip_address, total_memory = node_ip[:-1].split(',')
-            matchmaking.running_jobs[ip_address] = []
+            running_jobs[ip_address] = []
             node_list.append(ip_address)
             compute_nodes[ip_address] = {
                 'cpu': None, 'memory': None, 'last_seen': None,
@@ -83,9 +94,17 @@ def main():
                     msg = pickle.loads(data)
 
                     if msg.msg_type == 'HEARTBEAT':
-                        message_handlers.heartbeat_handler(compute_nodes, msg)
+                        # TODO
+                        message_handlers.heartbeat_handler(
+                            compute_nodes=compute_nodes, received_msg=msg)
                     elif msg.msg_type == 'JOB_SUBMIT':
-                        message_handlers.job_submit_handler(msg)
+                        job_receipt_id += 1
+                        message_handlers.job_submit_handler(
+                            job_queue=job_queue,
+                            compute_nodes=compute_nodes,
+                            running_jobs=running_jobs,
+                            received_msg=msg,
+                            job_receipt_id=job_receipt_id)
 
                 else:
                     print(sys.stderr, 'closing', client_address,
