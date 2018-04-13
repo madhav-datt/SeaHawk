@@ -50,6 +50,7 @@
         - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message
 
         - JOB_EXEC: Sent by server requesting execution of a job on the node.
+            Two types of JOB_EXEC messages
             Should have job object in content, and executable in file field.
 
         - JOB_PREEMPT: Sent by server requesting preemption of an executing
@@ -61,6 +62,7 @@
 
     * TODO
         - Make backup ip required in arg parse.
+        - Remove server crash detection process.
 """
 
 import argparse
@@ -216,11 +218,21 @@ def main():
                                          "type Message."
 
         # TODO: Add condition: 'and msg.msg_type != 'I AM NEW SERVER' if needed
-        if msg.sender != server_ip:
+        if msg.sender != server_ip and msg.msg_type == 'I_AM_NEW_SERVER':
+            # Primary server crash detected by backup server
+            # switch primary and backup server ips
+            server_ip, backup_ip = backup_ip, server_ip
+            message_handlers.server_crash_msg_handler(
+                shared_submitted_jobs_array,
+                shared_acknowledged_jobs_array,
+                executed_jobs_receipt_ids, ack_executed_jobs_receipt_ids,
+                server_ip)
+
+        elif msg.sender != server_ip:
             # Old message from a server detected to have crashed, ignore
             continue
 
-        if msg.msg_type == 'HEARTBEAT':
+        elif msg.msg_type == 'HEARTBEAT':
             # Removing pycharm's annoying unused warning for shared variable
             # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time = \
@@ -252,15 +264,6 @@ def main():
         elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
             message_handlers.submitted_job_completion_msg_handler(
                 msg, shared_completed_jobs_array, server_ip)
-
-        elif msg.msg_type == 'SERVER_CRASH':
-            # switch primary and backup server ips
-            server_ip, backup_ip = backup_ip, server_ip
-            message_handlers.server_crash_msg_handler(
-                shared_submitted_jobs_array,
-                shared_acknowledged_jobs_array,
-                executed_jobs_receipt_ids, ack_executed_jobs_receipt_ids,
-                server_ip)
 
         # TODO: Can put condition that if address=server_ip, don't close
         connection.close()
