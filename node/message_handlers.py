@@ -69,16 +69,15 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
     shared_acknowledged_jobs_array[ack_job_id] = True
 
 
-def job_exec_msg_handler(msg, execution_jobs_pid_dict):
+def job_exec_msg_handler(current_job, job_executable,
+                         execution_jobs_pid_dict):
     """Fork a process to execute the job
 
-    :param msg: message, received message of 'JOB_EXEC' msg_type
+    :param current_job: job, to be executed
+    :param job_executable: byte stream, of the job's executable
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
     :return: None
     """
-    # Get the job object
-    current_job = msg.content
-
     # Make new job directory
     current_job_directory = '%s%d' % (EXECUTING_JOB_DIRECTORY_PREFIX,
                                       current_job.receipt_id)
@@ -86,7 +85,7 @@ def job_exec_msg_handler(msg, execution_jobs_pid_dict):
         os.makedirs(current_job_directory)
 
     # Store a.out in this directory
-    executable_file_bytes = msg.file
+    executable_file_bytes = job_executable
     execution_dst = current_job_directory + current_job.get_executable_name()
     with open(execution_dst, 'wb') as file:
         file.write(executable_file_bytes)
@@ -114,7 +113,8 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     :param server_ip: str, id address of server
     :return: None
     """
-    job_receipt_id = msg.content
+    new_job, job_receipt_id = msg.content
+    new_job_executable = msg.file
 
     if job_receipt_id in executed_jobs_receipt_ids:
         # Duplicate message, just resend job information
@@ -142,6 +142,10 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         finally:
             # Only for safety, not really required.
             executed_jobs_receipt_ids.add(job_receipt_id)
+
+    # Now start new job execution
+    job_exec_msg_handler(current_job=new_job, job_executable=new_job_executable,
+                         execution_jobs_pid_dict=execution_jobs_pid_dict)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
