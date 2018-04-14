@@ -70,12 +70,16 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
 
 
 def job_exec_msg_handler(current_job, job_executable,
-                         execution_jobs_pid_dict):
+                         execution_jobs_pid_dict,
+                         executing_jobs_receipt_ids,
+                         executing_jobs_begin_times):
     """Fork a process to execute the job
 
     :param current_job: job, to be executed
     :param job_executable: byte stream, of the job's executable
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
+    :param executing_jobs_receipt_ids: set, receipt ids of executing jobs
+    :param executing_jobs_begin_times: dict, receipt id: approx begin time
     :return: None
     """
     # Make new job directory
@@ -99,17 +103,24 @@ def job_exec_msg_handler(current_job, job_executable,
     else:
         # Parent process
         os.waitpid(child_pid, 0)
+        # Do book-keeping
+        executing_jobs_receipt_ids.add(current_job.receipt_id)
+        executing_jobs_begin_times[current_job.receipt_id] = time.time()
         execution_jobs_pid_dict[current_job.receipt_id] = child_pid
 
 
 def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
-                               executed_jobs_receipt_ids, server_ip):
+                               executed_jobs_receipt_ids,
+                               executing_jobs_receipt_ids,
+                               executing_jobs_begin_times, server_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
     :param execution_jobs_pid_dict: dict, job receipt id:pid pairs
     :param executed_jobs_receipt_ids: set, receipt ids of jobs that are
         done executing
+    :param executing_jobs_receipt_ids: set, receipt id of all executing jobs
+    :param executing_jobs_begin_times: dict, receipt id: approx begin time
     :param server_ip: str, id address of server
     :return: None
     """
@@ -145,7 +156,9 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
 
     # Now start new job execution
     job_exec_msg_handler(current_job=new_job, job_executable=new_job_executable,
-                         execution_jobs_pid_dict=execution_jobs_pid_dict)
+                         execution_jobs_pid_dict=execution_jobs_pid_dict,
+                         executing_jobs_receipt_ids=executing_jobs_receipt_ids,
+                         executing_jobs_begin_times=executing_jobs_begin_times)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,

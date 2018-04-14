@@ -167,9 +167,13 @@ def main():
     shared_acknowledged_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
-    # Set to store all executed and acknowledged executed jobs' receipt ids
+    # Sets to store all executed and acknowledged executed jobs' receipt ids
     executed_jobs_receipt_ids = set()
     ack_executed_jobs_receipt_ids = set()
+    # Set to store receipt id of executing jobs
+    executing_jobs_receipt_ids = set()
+    # Dict to store execution begin time of executing
+    executing_jobs_begin_times = {}
 
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = {}
@@ -179,11 +183,15 @@ def main():
     process_submission_interface = mp.Process(
         target=submission_interface.run_submission_interface,
         args=(newstdin, shared_job_array, shared_submitted_jobs_array,
-              shared_acknowledged_jobs_array, shared_completed_jobs_array)
+              shared_acknowledged_jobs_array, shared_completed_jobs_array,
+              executed_jobs_receipt_ids, executing_jobs_receipt_ids,
+              executing_jobs_begin_times)
     )
 
     # Starting job submission interface process
     process_submission_interface.start()
+
+    return
 
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d')
@@ -253,12 +261,16 @@ def main():
             message_handlers.job_exec_msg_handler(
                 current_job=msg.content,
                 job_executable=msg.file,
-                execution_jobs_pid_dict=execution_jobs_pid_dict)
+                execution_jobs_pid_dict=execution_jobs_pid_dict,
+                executing_jobs_receipt_ids=executing_jobs_receipt_ids,
+                executing_jobs_begin_times=executing_jobs_begin_times)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
             message_handlers.job_preemption_msg_handler(
                 msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
-                server_ip)
+                executing_jobs_receipt_ids=executing_jobs_receipt_ids,
+                executing_jobs_begin_times=executing_jobs_begin_times,
+                server_ip=server_ip)
 
         elif msg.msg_type == 'EXECUTED_JOB_TO_PARENT':
             message_handlers.executed_job_to_parent_msg_handler(

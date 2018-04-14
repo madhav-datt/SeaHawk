@@ -12,6 +12,7 @@ import sys
 import os
 import pickle
 import shutil
+import time
 
 from .job import jobfile_parser
 
@@ -23,7 +24,10 @@ PROMPT_WELCOME_FILENAME = '/prompt_welcome'
 def run_submission_interface(newstdin, shared_job_array,
                              shared_submitted_jobs_array,
                              shared_acknowledged_jobs_array,
-                             shared_completed_jobs_array):
+                             shared_completed_jobs_array,
+                             executed_jobs_receipt_ids,
+                             executing_jobs_receipt_ids,
+                             executing_jobs_begin_times):
     """Handle job submission interface.
 
     Child process forked from main, with shared data array.
@@ -37,6 +41,9 @@ def run_submission_interface(newstdin, shared_job_array,
         submission has been acknowledged by server.
     :param shared_completed_jobs_array: mp.Array, idx set to true if job has
         completed execution.
+    :param executed_jobs_receipt_ids: set
+    :param executing_jobs_receipt_ids: set
+    :param executing_jobs_begin_times: dict, receipt id:approx begin time
     :return: None
 
     """
@@ -79,7 +86,8 @@ def run_submission_interface(newstdin, shared_job_array,
             # Print status of all received jobs
             print_status(shared_job_array, shared_submitted_jobs_array,
                          shared_acknowledged_jobs_array,
-                         shared_completed_jobs_array)
+                         shared_completed_jobs_array, executed_jobs_receipt_ids,
+                         executing_jobs_receipt_ids, executing_jobs_begin_times)
 
         elif command_type == 'QUIT':
             # noinspection PyProtectedMember
@@ -117,21 +125,27 @@ def print_help_message():
 
 
 def print_status(shared_job_array, shared_submitted_jobs_array,
-                 shared_acknowledged_jobs_array, shared_completed_jobs_array):
+                 shared_acknowledged_jobs_array, shared_completed_jobs_array,
+                 executed_jobs_receipt_ids,
+                 executing_jobs_receipt_ids, executing_jobs_begin_times):
     """Print the status of all received jobs to terminal.
 
     :param shared_job_array: mp.Array of type bool.
     :param shared_submitted_jobs_array: mp.Array of type bool.
     :param shared_acknowledged_jobs_array: mp.Array of type bool.
     :param shared_completed_jobs_array: mp.Array of type bool.
-
+    :param executed_jobs_receipt_ids: set, receipt ids of executed jobs
+    :param executing_jobs_receipt_ids: set
+    :param executing_jobs_begin_times: dict, receipt id:approx begin time
     """
     total_received_jobs = 0
 
     def yn_map(bool_val):
         return 'Y' if bool_val else 'N'
 
-    print('\n%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
+    print('\nStatus of your jobs')
+    print('-' * 20)
+    print('%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
                                       'ACKNOWLEDGED', 'COMPLETED'))
     for id_num in range(len(shared_job_array)):
         if shared_job_array[id_num]:
@@ -145,6 +159,25 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
         print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))
     else:
         print('\nTotal received jobs: %d\n' % total_received_jobs)
+
+    # Print status for all the executing jobs
+    total_executing_jobs = 0
+    print('\nStatus of executing jobs')
+    print('-' * 25)
+
+    current_time = time.time()
+    print('%-15s%-15s' % ('JOB ID', 'RUN TIME'))
+    for id_num in executing_jobs_receipt_ids:
+        total_executing_jobs += 1
+        if id_num in executed_jobs_receipt_ids:
+            exec_time = round(current_time-executing_jobs_begin_times[id_num])
+            print('%-20s%-15s' % (id_num, exec_time))
+        else:
+            print('%-20s%-15s' % (id_num, 'Completed'))
+    if total_executing_jobs == 0:
+        print('%-20s%-15s' % ('None', '-'))
+    else:
+        print('\nTotal executed/executing jobs: %d\n' % total_executing_jobs)
 
 
 def command_parser(command):
