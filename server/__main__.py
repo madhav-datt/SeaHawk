@@ -67,6 +67,8 @@
 
 import argparse
 import multiprocessing as mp
+import os
+import os.path
 import pickle
 import select
 import socket
@@ -82,6 +84,8 @@ SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
 CRASH_ASSUMPTION_TIME = 20  # seconds
 CRASH_DETECTOR_SLEEP_TIME = 2  # seconds
+
+BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
 
 compute_nodes = {}  # {node_id: status}
 node_list = []
@@ -155,6 +159,22 @@ def main():
                 'cpu': None, 'memory': None, 'last_seen': None,
                 'total_memory': total_memory,
             }
+
+    # Initialize current server state from backup snapshot
+    # Used in case primary backup is taking over as central server
+    if os.path.isfile(BACKUP_SERVER_STATE_PATH):
+        global compute_nodes, running_jobs, job_sender, job_executable, \
+            job_queue
+        with open(BACKUP_SERVER_STATE_PATH, 'rb') as backup_server_state:
+            server_state = pickle.load(backup_server_state)
+
+        compute_nodes = server_state.compute_nodes
+        running_jobs = server_state.running_jobs
+        job_sender = server_state.job_sender
+        job_executable = server_state.job_executable
+        job_queue = server_state.job_queue
+
+        os.remove(BACKUP_SERVER_STATE_PATH)
 
     process_crash_detector = mp.Process(
         target=detect_node_crash, args=(node_last_seen,))
