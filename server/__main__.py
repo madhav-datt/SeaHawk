@@ -3,13 +3,65 @@
     Responsible for communication with computing nodes, primary backup, job
     scheduling, load balancing, job-node matchmaking decisions etc.
 
-    Messages received from node:
+    Messages received from the node:
+        - JOB_SUBMIT: The node sends the job to be submitted for execution
+            in this message along with the executable file. The server tries to
+            schedule the job if possible, else adds it to the job queue.
+
+        - HEARTBEAT: The server(main) receives the cpu-time and memory of the
+            node through this heartbeat and also detects that the node is alive.
+            It responds with a heartbeat message of its own through a child
+            process
+
+        - EXECUTED_JOB: This message tells the server that the job given to the
+            node has either been completed or preempted(with the help of a
+            completed flag). If the job has been completed, the server removes
+            it from the job_queue and informs the node which has submitted the
+            job. Also, it tries to schedule the jobs in the job queue. On the
+            other hand, if the job is a preempted one, the server tries to
+            schedule it again.
+
+        - ACK_SUBMITTED_JOB_COMPLETION: The server ignores this.
+
+        - ACK_JOB_EXEC: The server ignores this
+
+        - ACK_JOB_EXEC_PREEMPT: The server ignores this.
 
     Messages received from backup:
+        - HEARTBEAT: Just tells the node that the backup is alive. The serves
+          responds with its own heartbeat message in response to this.
+
+    Messages received from its own child process:
+        - NODE_CRASH: The server main receives it from a child process after it
+          a node or a set of nodes has crashed. The server tries to schedule
+          jobs running on those nodes somewhere else.
 
     Messages sent to node:
+        - HEARTBEAT: Server sends this message in response to HEARTBEAT message
+            by node. A delay has been set in the server's response, so that
+            heartbeat messages do not congest the network.
+
+        - ACK_JOB_SUBMIT: Server sends this message on receiving a JOB_SUBMIT
+            message from the node. Includes job's submission id in
+            message's content field.
+
+        - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message
+
+        - JOB_EXEC: Sent by server requesting execution of a job on the node.
+            Has job object in content, and executable in file field.
+
+        - JOB_PREEMPT_EXEC: Sent by server requesting preemption of an executing
+            job, and execution of a new job. Has (new_job,
+            job_to_preempt receipt id) in content, and executable file of new
+            job in file.
+
+        - SUBMITTED_JOB_COMPLETION: Server, on receiving EXECUTED_JOB message
+            from a node, checks job's 'completed' attribute, and if True,
+            sends SUBMITTED_JOB_COMPLETION to submitting node
 
     Messages sent to backup:
+        - HEARTBEAT: This is sent in response to the heartbeat of the backup.
+            The heartbeat has the server state as its content.
 
 """
 
