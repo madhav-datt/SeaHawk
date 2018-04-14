@@ -1,4 +1,4 @@
-"""Script to run central server.
+"""Script to set up and run central server.
 
     Responsible for communication with computing nodes, primary backup, job
     scheduling, load balancing, job-node matchmaking decisions etc.
@@ -11,7 +11,7 @@
         - HEARTBEAT: The server(main) receives the cpu-time and memory of the
             node through this heartbeat and also detects that the node is alive.
             It responds with a heartbeat message of its own through a child
-            process
+            process.
 
         - EXECUTED_JOB: This message tells the server that the job given to the
             node has either been completed or preempted(with the help of a
@@ -23,18 +23,18 @@
 
         - ACK_SUBMITTED_JOB_COMPLETION: The server ignores this.
 
-        - ACK_JOB_EXEC: The server ignores this
+        - ACK_JOB_EXEC: The server ignores this.
 
         - ACK_JOB_EXEC_PREEMPT: The server ignores this.
 
     Messages received from backup:
         - HEARTBEAT: Just tells the node that the backup is alive. The serves
-          responds with its own heartbeat message in response to this.
+            responds with its own heartbeat message in response to this.
 
     Messages received from its own child process:
         - NODE_CRASH: The server main receives it from a child process after it
-          a node or a set of nodes has crashed. The server tries to schedule
-          jobs running on those nodes somewhere else.
+            a node or a set of nodes has crashed. The server tries to schedule
+            jobs running on those nodes somewhere else.
 
     Messages sent to node:
         - HEARTBEAT: Server sends this message in response to HEARTBEAT message
@@ -45,7 +45,7 @@
             message from the node. Includes job's submission id in
             message's content field.
 
-        - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message
+        - ACK_EXECUTED_JOB: Sent in response to EXECUTED_JOB message.
 
         - JOB_EXEC: Sent by server requesting execution of a job on the node.
             Has job object in content, and executable in file field.
@@ -57,12 +57,11 @@
 
         - SUBMITTED_JOB_COMPLETION: Server, on receiving EXECUTED_JOB message
             from a node, checks job's 'completed' attribute, and if True,
-            sends SUBMITTED_JOB_COMPLETION to submitting node
+            sends SUBMITTED_JOB_COMPLETION to submitting node.
 
     Messages sent to backup:
         - HEARTBEAT: This is sent in response to the heartbeat of the backup.
             The heartbeat has the server state as its content.
-
 """
 
 import argparse
@@ -76,6 +75,7 @@ import sys
 import time
 
 from . import message_handlers
+from .messaging import message
 from .messaging import messageutils
 from .utils import priorityqueue
 
@@ -144,6 +144,10 @@ def main():
              'client/computing node.')
     args = parser.parse_args()
     backup_ip = args.backup_ip
+
+    # In case of backup server taking over on original central server crash
+    # gives backup process enough time to terminate
+    time.sleep(CRASH_DETECTOR_SLEEP_TIME)
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
@@ -215,6 +219,8 @@ def main():
                 data = msg_socket.recv(BUFFER_SIZE)
                 if data:
                     msg = pickle.loads(data)
+                    assert isinstance(msg, message.Message), \
+                        "Received object on socket not of type Message."
 
                     if msg.msg_type == 'HEARTBEAT':
                         if msg.sender == backup_ip:
