@@ -74,13 +74,20 @@ def detect_node_crash(node_last_seen):
 def main():
     parser = argparse.ArgumentParser(description='Set up central server.')
     parser.add_argument(
-        '--ip', required=True, help='IP address of central server (this node).')
+        '--server-ip',
+        required=True,
+        help='IP address of central server (this node).')
+    parser.add_argument(
+        '--backup-ip',
+        required=True,
+        help='IP address of primary backup server.')
     parser.add_argument(
         '--nodes-file',
         required=True,
         help='Absolute path to txt file with IP address, total memory of each '
              'client/computing node.')
     args = parser.parse_args()
+    backup_ip = args.backup_ip
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
@@ -138,10 +145,21 @@ def main():
                     msg = pickle.loads(data)
 
                     if msg.msg_type == 'HEARTBEAT':
-                        message_handlers.heartbeat_handler(
-                            compute_nodes=compute_nodes,
-                            node_last_seen=node_last_seen,
-                            received_msg=msg)
+                        if msg.sender == backup_ip:
+                            # Heartbeat to backup server includes server state
+                            message_handlers.heartbeat_from_backup_handler(
+                                compute_nodes=compute_nodes,
+                                running_jobs=running_jobs,
+                                job_queue=job_queue,
+                                job_executable=job_executable,
+                                job_sender=job_sender,
+                                received_msg=msg)
+
+                        else:
+                            message_handlers.heartbeat_handler(
+                                compute_nodes=compute_nodes,
+                                node_last_seen=node_last_seen,
+                                received_msg=msg)
 
                     elif msg.msg_type == 'JOB_SUBMIT':
                         job_receipt_id += 1

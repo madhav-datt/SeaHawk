@@ -13,13 +13,51 @@ from . import matchmaking
 from .messaging import message
 from .messaging import messageutils
 from .utils import priorityqueue
+from .utils import serverstate
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 
 
+def heartbeat_from_backup_handler(compute_nodes,
+                                  running_jobs,
+                                  job_queue,
+                                  job_executable,
+                                  job_sender,
+                                  received_msg):
+    """Handler function for HEARTBEAT messages from backup server.
+
+    Includes state of central server, in case server crashes and the backup
+    needs to take over.
+
+    :param job_queue: Priority queue for jobs that could not be scheduled.
+    :param compute_nodes: Dictionary with cpu usage and memory of each node
+        {node_id: status}
+    :param running_jobs: Dictionary with jobs running on each system
+        {node_id: [list of jobs]}
+    :param job_sender: Dictionary with initial sender of jobs {job_id: sender}
+    :param job_executable: Dictionary with job executables {job_id: executable}
+    :param received_msg: message, received message.
+    """
+
+    server_state = serverstate.ServerState(
+        compute_nodes=compute_nodes,
+        running_jobs=running_jobs,
+        job_queue=job_queue,
+        job_executable=job_executable,
+        job_sender=job_sender)
+
+    # Send heartbeat message to backup server
+    # Creating new process to wait and reply to heartbeat messages
+    process_wait_send_heartbeat_to_backup = mp.Process(
+        target=messageutils.wait_send_heartbeat_to_backup,
+        args=(received_msg.sender, SERVER_SEND_PORT, server_state,)
+    )
+    process_wait_send_heartbeat_to_backup.start()
+
+
 def heartbeat_handler(compute_nodes, node_last_seen, received_msg):
-    """Handler function for HEARTBEAT messages.
+    """Handler function for HEARTBEAT messages from compute nodes.
 
     :param compute_nodes: Dictionary with cpu usage and memory of each node
         {node_id: status}
@@ -129,6 +167,9 @@ def executed_job_handler(job_queue,
             msg=completed_job_msg,
             to=job_sender[executed_job.receipt_id],
             port=SERVER_SEND_PORT)
+
+        del job_sender[executed_job.receipt_id]
+        del job_executable[executed_job.receipt_id]
 
         # Schedule jobs waiting in job_queue
 
