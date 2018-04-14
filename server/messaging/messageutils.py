@@ -115,6 +115,10 @@ def send_heartbeat(to, msg_socket=None, port=PORT):
     }
 
     # Construct the message with system resources and send to server
-    make_and_send_message(msg_type='HEARTBEAT', content=system_resources,
-                          file_path=None, to=to, msg_socket=msg_socket,
-                          port=port)
+    make_and_send_message(
+        msg_type='HEARTBEAT',
+        content=system_resources,
+        file_path=None,
+        to=to,
+        msg_socket=msg_socket,
+        port=port)

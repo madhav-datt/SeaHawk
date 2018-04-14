@@ -1,8 +1,11 @@
 """Message handlers for all messages received at server.
 
 Includes handlers for:
+    * Heartbeat message from primary backup.
     * Heartbeat message from client/compute nodes.
-    * Job submit
+    * Job submitted by node to server for scheduling.
+    * Executed job returned to server by node after running.
+    * Notification about node crashes.
 """
 
 import copy
