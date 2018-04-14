@@ -250,10 +250,10 @@ def main():
         elif msg.msg_type == 'JOB_EXEC':
             # TODO: See if num_execution_jobs_recvd is useful anywhere
             num_execution_jobs_recvd += 1
-            message_handlers.job_exec_msg_handler(current_job=msg.content,
-                                                  job_executable=msg.file,
-                                                  execution_jobs_pid_dict=
-                                                  execution_jobs_pid_dict)
+            message_handlers.job_exec_msg_handler(
+                current_job=msg.content,
+                job_executable=msg.file,
+                execution_jobs_pid_dict=execution_jobs_pid_dict)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
             message_handlers.job_preemption_msg_handler(
