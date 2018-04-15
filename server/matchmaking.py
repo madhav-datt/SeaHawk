@@ -41,7 +41,7 @@ def matchmaking(job, compute_nodes, running_jobs):
             diff_from_max = float('inf')
             for idle_machine in idle_machines:
                 memory_diff = abs(
-                    job.max_memory - compute_nodes[idle_machines]['memory'])
+                    job.max_memory - compute_nodes[idle_machine]['memory'])
                 if memory_diff < diff_from_max:
                     diff_from_max = memory_diff
                     best_candidate = idle_machine

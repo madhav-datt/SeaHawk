@@ -71,7 +71,6 @@ import os.path
 import pickle
 import select
 import socket
-import sys
 import time
 
 from . import message_handlers
@@ -185,7 +184,6 @@ def main():
 
     # Creates a TCP/IP socket
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setblocking(0)
 
     # Binds the socket to the port
     server_address = ('', SERVER_RECV_PORT)
@@ -201,7 +199,6 @@ def main():
     while inputs:
 
         # Wait for at least one of the sockets to be ready for processing
-        print('Waiting for the next event')
         readable, _, _ = select.select(inputs, outputs, inputs)
 
         # Handle inputs
@@ -211,18 +208,17 @@ def main():
                 # A "readable" server socket is ready to accept a connection
                 connection, client_address = msg_socket.accept()
                 print('New connection from', client_address)
-                connection.setblocking(0)
                 inputs.append(connection)
 
             else:
                 data = msg_socket.recv(BUFFER_SIZE)
                 if data:
 
-                    # data_list = []
-                    # while data:
-                    #     data_list.append(data)
-                    #     data = connection.recv(BUFFER_SIZE)
-                    # data = b''.join(data_list)
+                    data_list = []
+                    while data:
+                        data_list.append(data)
+                        data = msg_socket.recv(BUFFER_SIZE)
+                    data = b''.join(data_list)
 
                     msg = pickle.loads(data)
                     assert isinstance(msg, message.Message), \

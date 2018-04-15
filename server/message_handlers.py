@@ -162,7 +162,7 @@ def executed_job_handler(job_queue,
         msg_socket=None)
     running_jobs[received_msg.sender].remove(executed_job)
 
-    if executed_job.complete:
+    if executed_job.completed:
 
         # Send completion result to initial node where job was created.
         completed_job_msg = message.Message(

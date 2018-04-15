@@ -76,3 +76,5 @@ class Job:
 
         return 'JOB: ' + str(self.submission_id) + ',' + str(self.receipt_id)
 
+    def __eq__(self, other):
+        return self.receipt_id == other.receipt_id
