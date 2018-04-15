@@ -1,6 +1,6 @@
 name: myjob1
 executable: /home/avikalp/Desktop/distributed/project/ds-project/node/job/sample_executable
-priority: 5
+priority: 10
 time_required: 35
 min_memory: 100
 min_cores: 1

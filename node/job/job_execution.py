@@ -8,22 +8,23 @@ __main__.py module's code.
 import os
 import pickle
 import signal
-import subprocess
+import stat
 import time
+import subprocess
 
 from ...messaging import messageutils
-from ...messaging.network_params import CLIENT_SEND_PORT, CLIENT_RECV_PORT, \
-    LOCAL_IP
+from ...messaging.network_params import CLIENT_SEND_PORT
 
 JOB_PICKLE_FILE = '/job.pickle'
 
 
-def execute_job(current_job, execution_dst, current_job_directory):
+def execute_job(current_job, execution_dst, current_job_directory, server_ip):
     """Execute the executable file, and send submission results to server_ip
 
     :param current_job: job object, to be executed
     :param execution_dst: str, path to executable file
     :param current_job_directory: str, directory storing job's files
+    :param server_ip: str, ip address of server
     :return: None
     """
 
@@ -31,7 +32,7 @@ def execute_job(current_job, execution_dst, current_job_directory):
     start_time = time.time()
     # File where updated job object will be stored
     job_pickle_file = \
-        current_job_directory + str(current_job.receipt_id) + JOB_PICKLE_FILE
+        current_job_directory + JOB_PICKLE_FILE
 
     def sigint_handler(signum, frame):
         """Handle sigint signal sent by parent
@@ -42,7 +43,6 @@ def execute_job(current_job, execution_dst, current_job_directory):
         :param frame: frame object
         :return: None
         """
-
         preemption_end_time = time.time()
 
         # Update job run time, completion status
@@ -64,20 +64,25 @@ def execute_job(current_job, execution_dst, current_job_directory):
         with open(job_pickle_file, 'wb') as _handle:
             pickle.dump(current_job, _handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        # Prepare and send executed job information message to parent
-        messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
+        # Prepare and send executed job information message to server
+        messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
                                            content=current_job,
-                                           file_path=None, to=LOCAL_IP,
+                                           file_path=None, to=server_ip,
                                            msg_socket=None,
-                                           port=CLIENT_RECV_PORT)
+                                           port=CLIENT_SEND_PORT)
 
         # Gracefully exit
         os._exit(0)
 
     # Mask the SIGINT signal with sigint_handler function
-    signal.signal(signal.SIGINT, sigint_handler)
+    signal.signal(signal.SIGTERM, sigint_handler)
+
+    # Elevate privileges
+    st = os.stat(execution_dst)
+    os.chmod(execution_dst, st.st_mode | stat.S_IEXEC)
 
     # Begin execution
+    # os.system(execution_dst)
     subprocess.call([execution_dst])
     # Execution call completed
     end_time = time.time()
@@ -100,7 +105,7 @@ def execute_job(current_job, execution_dst, current_job_directory):
         pickle.dump(current_job, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Prepare and send job completion message to parent
-    messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
+    messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
                                        content=current_job,
-                                       file_path=None, to=LOCAL_IP,
+                                       file_path=None, to=server_ip,
                                        msg_socket=None, port=CLIENT_SEND_PORT)

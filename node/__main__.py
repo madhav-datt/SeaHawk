@@ -148,7 +148,6 @@ def main():
     Job execution is handed partly by this and a forked child process.
     Heartbeat messages are constantly exchanged.
     """
-
     # Begin argument parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("-serverip", help="IP address of central server",
@@ -265,7 +264,9 @@ def main():
                 job_executable=msg.file,
                 execution_jobs_pid_dict=execution_jobs_pid_dict,
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
-                executing_jobs_begin_times=executing_jobs_begin_times)
+                executing_jobs_begin_times=executing_jobs_begin_times,
+                executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+                server_ip=server_ip)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
             message_handlers.job_preemption_msg_handler(
