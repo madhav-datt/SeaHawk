@@ -153,12 +153,12 @@ def main():
     manager = mp.Manager()
     node_last_seen = manager.dict()  # {node_id: last_seen_time}
 
-    with open(args.node_file) as nodes_ip_file:
+    with open(args.nodes_file) as nodes_ip_file:
         for node_ip in nodes_ip_file:
             ip_address, total_memory = node_ip[:-1].split(',')
             running_jobs[ip_address] = []
             node_list.append(ip_address)
-            node_last_seen[ip_address] = None
+            node_last_seen[ip_address] = time.time()
             compute_nodes[ip_address] = {
                 'cpu': None, 'memory': None, 'last_seen': None,
                 'total_memory': total_memory,
