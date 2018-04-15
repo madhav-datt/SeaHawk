@@ -87,13 +87,6 @@ CRASH_DETECTOR_SLEEP_TIME = 2  # seconds
 
 BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
 
-compute_nodes = {}  # {node_id: status}
-node_list = []
-job_queue = priorityqueue.JobQueue()
-running_jobs = {}  # {node_id: [list of jobs]}
-job_executable = {}  # {job_id: executable}
-job_sender = {}  # {job_id: sender}
-
 
 def detect_node_crash(node_last_seen):
     """Detects node crashes.
@@ -145,6 +138,13 @@ def main():
     args = parser.parse_args()
     backup_ip = args.backup_ip
 
+    compute_nodes = {}  # {node_id: status}
+    node_list = []
+    job_queue = priorityqueue.JobQueue()
+    running_jobs = {}  # {node_id: [list of jobs]}
+    job_executable = {}  # {job_id: executable}
+    job_sender = {}  # {job_id: sender}
+
     # In case of backup server taking over on original central server crash
     # gives backup process enough time to terminate
     time.sleep(CRASH_DETECTOR_SLEEP_TIME)
@@ -167,8 +167,6 @@ def main():
     # Initialize current server state from backup snapshot
     # Used in case primary backup is taking over as central server
     if os.path.isfile(BACKUP_SERVER_STATE_PATH):
-        global compute_nodes, running_jobs, job_sender, job_executable, \
-            job_queue
         with open(BACKUP_SERVER_STATE_PATH, 'rb') as backup_server_state:
             server_state = pickle.load(backup_server_state)
 
@@ -251,7 +249,6 @@ def main():
                             job_receipt_id=job_receipt_id)
 
                     elif msg.msg_type == 'EXECUTED_JOB':
-                        global job_queue
                         job_queue = message_handlers.executed_job_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
