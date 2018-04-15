@@ -99,6 +99,7 @@ def main():
     process_server_crash_detection = mp.Process(
         target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
     )
+    process_server_crash_detection.daemon = 1
     process_server_crash_detection.start()
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
