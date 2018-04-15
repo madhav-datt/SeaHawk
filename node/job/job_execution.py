@@ -10,6 +10,7 @@ import pickle
 import signal
 import stat
 import time
+import subprocess
 
 from ...messaging import messageutils
 from ...messaging.network_params import CLIENT_SEND_PORT
@@ -42,7 +43,6 @@ def execute_job(current_job, execution_dst, current_job_directory, server_ip):
         :param frame: frame object
         :return: None
         """
-
         preemption_end_time = time.time()
 
         # Update job run time, completion status
@@ -75,14 +75,15 @@ def execute_job(current_job, execution_dst, current_job_directory, server_ip):
         os._exit(0)
 
     # Mask the SIGINT signal with sigint_handler function
-    signal.signal(signal.SIGINT, sigint_handler)
+    signal.signal(signal.SIGTERM, sigint_handler)
 
     # Elevate privileges
     st = os.stat(execution_dst)
     os.chmod(execution_dst, st.st_mode | stat.S_IEXEC)
 
     # Begin execution
-    os.system(execution_dst)
+    # os.system(execution_dst)
+    subprocess.call([execution_dst])
     # Execution call completed
     end_time = time.time()
 

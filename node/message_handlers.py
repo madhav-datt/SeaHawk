@@ -108,7 +108,7 @@ def job_exec_msg_handler(current_job, job_executable,
             server_ip=server_ip)
     else:
         # Parent process
-        os.waitpid(child_pid, 0)
+        # os.waitpid(child_pid, 0)
         # Do book-keeping
         executing_jobs_receipt_ids.add(current_job.receipt_id)
         executing_jobs_begin_times[current_job.receipt_id] = time.time()
@@ -134,32 +134,32 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     new_job, job_receipt_id = msg.content
     new_job_executable = msg.file
 
-    if job_receipt_id in executed_jobs_receipt_ids:
-        # Duplicate message, just resend job information
-        resend_executed_job_msg(job_receipt_id, server_ip)
-    else:
-        # Get process id of child that executed/is executing this job
-        executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
+    # if job_receipt_id in executed_jobs_receipt_ids:
+    #     # Duplicate message, just resend job information
+    #     resend_executed_job_msg(job_receipt_id, server_ip)
+    # else:
+    # Get process id of child that executed/is executing this job
+    executing_child_pid = execution_jobs_pid_dict[job_receipt_id]
 
-        # Send kill signal to child, which will be handled via sigint_handler
-        # sigint_handler will send EXECUTED_JOB to central server
-        try:
-            os.kill(executing_child_pid, signal.SIGINT)
-        except OSError as err:
-            if err.errno == errno.ESRCH:
-                # ESRCH: child process no longer exists
-                # This implies that either this job was preempted, and this
-                # preemption message is a duplicate from switched server, or
-                # the process already completed and server didn't receive
-                # completion message before sending preempt request,
-                # or the servers switched. In any case,
-                # we resend the EXECUTED_JOB msg for safety.
-                # Ideally, it should be not be possible to come to this section
-                # due to initial check on executed_jobs_receipt_ids
-                resend_executed_job_msg(job_receipt_id, server_ip)
-        finally:
-            # Only for safety, not really required.
-            executed_jobs_receipt_ids.add(job_receipt_id)
+    # Send kill signal to child, which will be handled via sigint_handler
+    # sigint_handler will send EXECUTED_JOB to central server
+    try:
+        os.kill(executing_child_pid, signal.SIGTERM)
+    except OSError as err:
+        if err.errno == errno.ESRCH:
+            # ESRCH: child process no longer exists
+            # This implies that either this job was preempted, and this
+            # preemption message is a duplicate from switched server, or
+            # the process already completed and server didn't receive
+            # completion message before sending preempt request,
+            # or the servers switched. In any case,
+            # we resend the EXECUTED_JOB msg for safety.
+            # Ideally, it should be not be possible to come to this section
+            # due to initial check on executed_jobs_receipt_ids
+            resend_executed_job_msg(job_receipt_id, server_ip)
+    finally:
+        # Only for safety, not really required.
+        executed_jobs_receipt_ids.add(job_receipt_id)
 
     # Now start new job execution
     job_exec_msg_handler(current_job=new_job, job_executable=new_job_executable,
@@ -182,7 +182,6 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
     :param server_ip: str, ip address of server
     """
     executed_jobs_receipt_ids.add(msg.content.receipt_id)
-    print('sending exec msg to server')
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
 
