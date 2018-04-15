@@ -13,8 +13,8 @@ import multiprocessing as mp
 import time
 
 from . import matchmaking
-from .messaging import message
-from .messaging import messageutils
+from ..messaging import message
+from ..messaging import messageutils
 from .utils import priorityqueue
 from .utils import serverstate
 

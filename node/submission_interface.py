@@ -146,7 +146,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
     print('\nStatus of your jobs')
     print('-' * 20)
     print('%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
-                                      'ACKNOWLEDGED', 'COMPLETED'))
+                                    'ACKNOWLEDGED', 'COMPLETED'))
     for id_num in range(len(shared_job_array)):
         if shared_job_array[id_num]:
             total_received_jobs += 1

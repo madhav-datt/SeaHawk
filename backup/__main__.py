@@ -32,8 +32,8 @@ import socket
 import time
 
 from . import message_handlers
-from .messaging import message
-from .messaging import messageutils
+from ..messaging import message
+from ..messaging import messageutils
 
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006

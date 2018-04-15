@@ -75,8 +75,8 @@ import sys
 import time
 
 from . import message_handlers
-from .messaging import message
-from .messaging import messageutils
+from ..messaging import message
+from ..messaging import messageutils
 from .utils import priorityqueue
 
 SERVER_SEND_PORT = 5005

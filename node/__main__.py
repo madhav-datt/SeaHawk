@@ -64,6 +64,8 @@
     * TODO
         - Make backup ip required in arg parse.
         - Remove server crash detection process.
+        - Change back crash assumption time
+        - Kill the crash detection process as well with kill
 """
 
 import argparse
@@ -77,15 +79,16 @@ from ctypes import c_bool
 
 from . import message_handlers
 from . import submission_interface
-from .messaging import messageutils
-from .messaging.message import Message
-from .messaging.network_params import CLIENT_RECV_PORT
-from .messaging.network_params import CLIENT_SEND_PORT
-from .messaging.network_params import BUFFER_SIZE
-from .messaging.network_params import CRASH_ASSUMPTION_TIME
+from ..messaging import messageutils
+from ..messaging.message import Message
+from ..messaging.network_params import CLIENT_RECV_PORT
+from ..messaging.network_params import CLIENT_SEND_PORT
+from ..messaging.network_params import BUFFER_SIZE
+# from .messaging.network_params import CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
 JOB_ARRAY_SIZE = 50
+CRASH_ASSUMPTION_TIME = 200
 
 
 def detect_server_crash(shared_last_heartbeat_recv_time):
@@ -191,10 +194,8 @@ def main():
     # Starting job submission interface process
     process_submission_interface.start()
 
-    return
-
     # Shared variable storing time of last heartbeat receipt, of type float
-    shared_last_heartbeat_recv_time = mp.Value('d')
+    shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
     # Creating new process for server crash detection
     process_server_crash_detection = mp.Process(

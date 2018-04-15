@@ -18,9 +18,9 @@ import signal
 import time
 
 from .job import job_execution
-from .messaging import messageutils
-from .messaging.network_params import CLIENT_SEND_PORT
-from .messaging.network_params import CRASH_ASSUMPTION_TIME
+from ..messaging import messageutils
+from ..messaging.network_params import CLIENT_SEND_PORT
+from ..messaging.network_params import CRASH_ASSUMPTION_TIME
 
 SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
 EXECUTING_JOB_DIRECTORY_PREFIX = './exec_job'
