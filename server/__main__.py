@@ -219,6 +219,7 @@ def main():
                     msg = pickle.loads(data)
                     assert isinstance(msg, message.Message), \
                         "Received object on socket not of type Message."
+                    print(msg)
 
                     if msg.msg_type == 'HEARTBEAT':
                         if msg.sender == backup_ip:

@@ -67,3 +67,12 @@ class Job:
 
         executable_address_partitions = self.executable.split('/')
         return '/' + executable_address_partitions[-1]
+
+    def __str__(self):
+        """Custom function to print job details.
+
+        :return: String representation of job object.
+        """
+
+        return 'JOB: ' + self.submission_id + ',' + self.receipt_id
+

@@ -38,8 +38,8 @@ from ..messaging import messageutils
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
 BUFFER_SIZE = 1048576
-CRASH_ASSUMPTION_TIME = 20  # seconds
-CRASH_DETECTOR_SLEEP_TIME = 2  # seconds
+CRASH_ASSUMPTION_TIME = 200  # seconds
+CRASH_DETECTOR_SLEEP_TIME = 200  # seconds
 
 
 def detect_server_crash(server_last_seen_time):

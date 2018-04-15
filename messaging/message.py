@@ -55,3 +55,11 @@ class Message(object):
         if file_path is not None:
             with open(file_path, 'rb') as file:
                 self.file = file.read()
+
+    def __str__(self):
+        """Custom function to print message details.
+
+        :return: String representation of message.
+        """
+
+        return self.msg_type + ' ' + str(self.content)

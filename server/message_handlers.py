@@ -74,8 +74,9 @@ def heartbeat_handler(compute_nodes, node_last_seen, received_msg):
         # Node has recovered and needs to be added back to list of nodes
         compute_nodes[received_msg.sender] = {}
 
-    compute_nodes[received_msg.sender]['cpu'] = received_msg['cpu']
-    compute_nodes[received_msg.sender]['memory'] = received_msg['memory']
+    compute_nodes[received_msg.sender]['cpu'] = received_msg.content['cpu']
+    compute_nodes[received_msg.sender]['memory'] = \
+        received_msg.content['memory']
     compute_nodes[received_msg.sender]['last_seen'] = time.time()
     node_last_seen[received_msg.sender] = \
         compute_nodes[received_msg.sender]['last_seen']
