@@ -52,11 +52,11 @@ def matchmaking(job, compute_nodes, running_jobs):
 
         else:
             # Order by cpu usage in case no machine is idle
-            min_cpu_usage = 100
-            for idle_machine in idle_machines:
-                if compute_nodes[idle_machine]['cpu'] < min_cpu_usage:
-                    min_cpu_usage = compute_nodes[idle_machine]['cpu']
-                    best_candidate = idle_machine
+            max_cpu_available = 0
+            for node_id, status in compute_nodes.items():
+                if compute_nodes[node_id]['cpu'] > max_cpu_available:
+                    max_cpu_available = compute_nodes[node_id]['cpu']
+                    best_candidate = node_id
 
             running_jobs[best_candidate].append(job)
             return best_candidate, None
