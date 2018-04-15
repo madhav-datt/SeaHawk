@@ -76,14 +76,12 @@ def execute_job(current_job, execution_dst, current_job_directory,
             pickle.dump(current_job, _handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         # Prepare and send executed job information message to parent
-        print('to parent')
         executed_jobs_receipt_ids[job_id] = 0
         messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
                                            content=current_job,
                                            file_path=None, to=server_ip,
                                            msg_socket=None,
                                            port=CLIENT_SEND_PORT)
-        print('to parent done')
         # Gracefully exit
         os._exit(0)
 
@@ -119,11 +117,9 @@ def execute_job(current_job, execution_dst, current_job_directory,
 
     # Prepare and send job completion message to parent
     # executed_jobs_receipt_ids[job_id] = 0
-    print('to parent BIG')
     executed_jobs_receipt_ids[job_id] = 0
     messageutils.make_and_send_message(msg_type='EXECUTED_JOB',
                                        content=current_job,
                                        file_path=None, to=server_ip,
                                        msg_socket=None,
                                        port=CLIENT_SEND_PORT)
-    print('to parent done BIG')
