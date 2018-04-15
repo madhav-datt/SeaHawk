@@ -56,7 +56,7 @@ def detect_server_crash(server_last_seen_time):
         time.sleep(CRASH_DETECTOR_SLEEP_TIME)
 
         current_time = time.time()
-        time_since_last_heartbeat = current_time - server_last_seen_time
+        time_since_last_heartbeat = current_time - server_last_seen_time.value
         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
 
             # Make and send a crash message to main process which is listening
