@@ -72,7 +72,9 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
 def job_exec_msg_handler(current_job, job_executable,
                          execution_jobs_pid_dict,
                          executing_jobs_receipt_ids,
-                         executing_jobs_begin_times):
+                         executing_jobs_begin_times,
+                         executed_jobs_receipt_ids,
+                         server_ip):
     """Fork a process to execute the job
 
     :param current_job: job, to be executed
@@ -80,6 +82,8 @@ def job_exec_msg_handler(current_job, job_executable,
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
     :param executing_jobs_receipt_ids: set, receipt ids of executing jobs
     :param executing_jobs_begin_times: dict, receipt id: approx begin time
+    :param executed_jobs_receipt_ids: set
+    :param server_ip: str, ip address
     :return: None
     """
     # Make new job directory
@@ -91,6 +95,7 @@ def job_exec_msg_handler(current_job, job_executable,
     # Store a.out in this directory
     executable_file_bytes = job_executable
     execution_dst = current_job_directory + current_job.get_executable_name()
+
     with open(execution_dst, 'wb') as file:
         file.write(executable_file_bytes)
 
@@ -99,7 +104,8 @@ def job_exec_msg_handler(current_job, job_executable,
     if child_pid == 0:
         # Child process
         job_execution.execute_job(
-            current_job, execution_dst, current_job_directory)
+            current_job, execution_dst, current_job_directory,
+            server_ip=server_ip)
     else:
         # Parent process
         os.waitpid(child_pid, 0)
@@ -107,6 +113,7 @@ def job_exec_msg_handler(current_job, job_executable,
         executing_jobs_receipt_ids.add(current_job.receipt_id)
         executing_jobs_begin_times[current_job.receipt_id] = time.time()
         execution_jobs_pid_dict[current_job.receipt_id] = child_pid
+        executed_jobs_receipt_ids.add(current_job.receipt_id)
 
 
 def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
@@ -158,7 +165,9 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     job_exec_msg_handler(current_job=new_job, job_executable=new_job_executable,
                          execution_jobs_pid_dict=execution_jobs_pid_dict,
                          executing_jobs_receipt_ids=executing_jobs_receipt_ids,
-                         executing_jobs_begin_times=executing_jobs_begin_times)
+                         executing_jobs_begin_times=executing_jobs_begin_times,
+                         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+                         server_ip=server_ip)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
@@ -173,6 +182,7 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
     :param server_ip: str, ip address of server
     """
     executed_jobs_receipt_ids.add(msg.content.receipt_id)
+    print('sending exec msg to server')
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
 
@@ -207,10 +217,11 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
 
     # Save the log file in the job's directory in the cwd
     # TODO: Handle directory does not exist condition
-    job_directory = '%s%d' % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_submission_id)
-    run_log_file_path = job_directory + '/run_log'
-    with open(run_log_file_path, 'wb') as file:
-        file.write(msg.file)
+    # job_directory = '%s%d' \
+    #                 % (SUBMITTED_JOB_DIRECTORY_PREFIX, job_submission_id)
+    # run_log_file_path = job_directory + '/run_log'
+    # with open(run_log_file_path, 'wb') as file:
+    #     file.write(msg.file)
 
     # Prepare and send acknowledgement message for completion message
     messageutils.make_and_send_message(
