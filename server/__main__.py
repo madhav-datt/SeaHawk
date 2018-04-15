@@ -179,8 +179,6 @@ def main():
         job_executable = server_state.job_executable
         job_queue = server_state.job_queue
 
-        os.remove(BACKUP_SERVER_STATE_PATH)
-
     process_crash_detector = mp.Process(
         target=detect_node_crash, args=(node_last_seen, server_ip,))
     process_crash_detector.start()
