@@ -96,7 +96,7 @@ def main():
     server_state = None
 
     # Shared variable storing time of last heartbeat receipt, of type float
-    shared_last_heartbeat_recv_time = mp.Value('d')
+    shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
     # Creating new process for server crash detection
     process_server_crash_detection = mp.Process(
@@ -136,7 +136,7 @@ def main():
             # TODO: Discuss central server crash between two heartbeats.
             # Removing pycharm's annoying unused warning for shared variable
             # noinspection PyUnusedLocal
-            shared_last_heartbeat_recv_time = time.time()
+            shared_last_heartbeat_recv_time.value = time.time()
             server_state = message_handlers.heartbeat_handler(received_msg=msg)
 
         elif msg.msg_type == 'SERVER_CRASH':
