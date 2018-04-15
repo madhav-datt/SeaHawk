@@ -24,7 +24,7 @@ def matchmaking(job, compute_nodes, running_jobs):
 
     # Find the set of probable candidates
     for node_id, status in compute_nodes.items():
-        if status['memory'] >= job.min_memory and status['cpu'] < 80:
+        if status['memory'] >= job.min_memory and status['cpu'] > 20:
             candidates.append(node_id)
 
     # Try to assign a node for the job from the probable candidates
