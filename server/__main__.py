@@ -88,7 +88,7 @@ SERVER_START_WAIT_TIME = 5  # seconds
 BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
 
 
-def detect_node_crash(node_last_seen):
+def detect_node_crash(node_last_seen, server_ip):
     """Detects node crashes.
 
     Run as a child process, periodically checking last heartbeat times for each
@@ -96,6 +96,7 @@ def detect_node_crash(node_last_seen):
 
     :param node_last_seen: Dictionary with time when last heartbeat was
         received from node {node_id: last_seen_time}
+    :param server_ip: String with IP address of server (this node).
     """
 
     while True:
@@ -117,7 +118,7 @@ def detect_node_crash(node_last_seen):
             messageutils.make_and_send_message(msg_type='NODE_CRASH',
                                                content=crashed_nodes,
                                                file_path=None,
-                                               to='10.145.213.142',
+                                               to=server_ip,
                                                msg_socket=None,
                                                port=SERVER_RECV_PORT)
 
@@ -139,6 +140,7 @@ def main():
              'client/computing node.')
     args = parser.parse_args()
     backup_ip = args.backup_ip
+    server_ip = args.server_ip
 
     compute_nodes = {}  # {node_id: status}
     node_list = []
@@ -181,7 +183,7 @@ def main():
         os.remove(BACKUP_SERVER_STATE_PATH)
 
     process_crash_detector = mp.Process(
-        target=detect_node_crash, args=(node_last_seen,))
+        target=detect_node_crash, args=(node_last_seen, server_ip,))
     process_crash_detector.start()
 
     # Creates a TCP/IP socket
@@ -209,7 +211,6 @@ def main():
             if msg_socket is server:
                 # A "readable" server socket is ready to accept a connection
                 connection, client_address = msg_socket.accept()
-                # print('New connection from', client_address)
                 inputs.append(connection)
 
             else:
@@ -287,7 +288,6 @@ def main():
                             job_executable=job_executable)
 
                 else:
-                    # print('Closing', client_address, 'after reading no data')
                     inputs.remove(msg_socket)
                     msg_socket.close()
 

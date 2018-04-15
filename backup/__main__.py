@@ -38,11 +38,11 @@ from ..messaging import messageutils
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
 BUFFER_SIZE = 1048576
-CRASH_ASSUMPTION_TIME = 200  # seconds
-CRASH_DETECTOR_SLEEP_TIME = 200  # seconds
+CRASH_ASSUMPTION_TIME = 20  # seconds
+CRASH_DETECTOR_SLEEP_TIME = 5  # seconds
 
 
-def detect_server_crash(server_last_seen_time):
+def detect_server_crash(server_last_seen_time, backup_ip):
     """Detects central server crashes.
 
     Run as a child process, periodically checking last heartbeat times for each
@@ -50,6 +50,7 @@ def detect_server_crash(server_last_seen_time):
 
     :param server_last_seen_time: Float with time when last heartbeat was
         received from central server.
+    :param backup_ip: String with IP address of backup server (this node).
     """
 
     while True:
@@ -67,7 +68,7 @@ def detect_server_crash(server_last_seen_time):
             messageutils.make_and_send_message(msg_type='SERVER_CRASH',
                                                content=None,
                                                file_path=None,
-                                               to='127.0.0.1',
+                                               to=backup_ip,
                                                msg_socket=None,
                                                port=CLIENT_RECV_PORT)
 
@@ -99,7 +100,8 @@ def main():
 
     # Creating new process for server crash detection
     process_server_crash_detection = mp.Process(
-        target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
+        target=detect_server_crash,
+        args=(shared_last_heartbeat_recv_time, backup_ip, )
     )
     process_server_crash_detection.daemon = 1
     process_server_crash_detection.start()
