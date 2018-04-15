@@ -167,13 +167,14 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
     current_time = time.time()
     print('%-15s%-15s' % ('JOB ID', 'RUN TIME'))
-    for id_num in executing_jobs_receipt_ids:
+    for id_num in executing_jobs_receipt_ids.keys():
         total_executing_jobs += 1
-        if id_num in executed_jobs_receipt_ids:
-            exec_time = round(current_time-executing_jobs_begin_times[id_num])
-            print('%-20s%-15s' % (id_num, exec_time))
-        else:
+        if id_num in set(executed_jobs_receipt_ids.keys()):
             print('%-20s%-15s' % (id_num, 'Completed'))
+        else:
+            exec_time = round(current_time - executing_jobs_begin_times[id_num])
+            print('%-20s%-15s' % (id_num, exec_time))
+
     if total_executing_jobs == 0:
         print('%-20s%-15s' % ('None', '-'))
     else:

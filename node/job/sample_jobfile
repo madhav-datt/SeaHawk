@@ -1,5 +1,5 @@
 name: myjob1
-executable: /home/chatrasen/Documents/8th_sem/DS/ds-project/node/job/sample_executable
+executable: /home/avikalp/Desktop/distributed/project/ds-project/node/job/sample_executable
 priority: 5
 time_required: 35
 min_memory: 100

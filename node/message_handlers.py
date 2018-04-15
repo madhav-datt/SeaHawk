@@ -28,6 +28,10 @@ JOB_PICKLE_FILE = '/job.pickle'
 
 
 def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
+                          executing_jobs_receipt_ids, executed_jobs_receipt_ids,
+                          executing_jobs_begin_times,
+                          executing_jobs_required_times,
+                          execution_jobs_pid_dict,
                           server_ip):
     """Scan job_array for jobs queued up for submission, send to server.
 
@@ -35,6 +39,11 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         requested submission
     :param shared_submitted_jobs_array: shared mp.Array, where idx is set
         to True if job has been submitted to server
+    :param executed_jobs_receipt_ids: set, receipt ids of all executed jobs
+    :param executing_jobs_receipt_ids: set, receipt ids of all executed/ing jobs
+    :param executing_jobs_begin_times: dict, receipt id:approx begin time
+    :param executing_jobs_required_times: dict, receipt id:required time
+    :param execution_jobs_pid_dict: dict, receipt id: executing child pid
     :param server_ip: str, ip address of server
     :return: float, heartbeat receive time
     """
@@ -50,6 +59,22 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
             # Update shared_submitted_jobs_array
             shared_submitted_jobs_array[itr] = True
             # TODO: Add log entry here
+
+    for job_id in set(executing_jobs_receipt_ids.keys()) - \
+            set(executed_jobs_receipt_ids.keys()):
+        time_run = time.time() - executing_jobs_begin_times[job_id]
+        if time_run >= executing_jobs_required_times[job_id]:
+            executing_child_pid = execution_jobs_pid_dict[job_id]
+            try:
+                os.kill(executing_child_pid, signal.SIGTERM)
+            except OSError as err:
+                if err.errno == errno.ESRCH:
+                    # ESRCH: child process no longer exists
+                    resend_executed_job_msg(job_id, server_ip)
+            finally:
+                # Only for safety, not really required.
+                executed_jobs_receipt_ids[job_id] = 0
+            break
 
     # Send heartbeat back to the server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
@@ -73,8 +98,9 @@ def job_exec_msg_handler(current_job, job_executable,
                          execution_jobs_pid_dict,
                          executing_jobs_receipt_ids,
                          executing_jobs_begin_times,
+                         executing_jobs_required_times,
                          executed_jobs_receipt_ids,
-                         server_ip):
+                         server_ip, self_ip):
     """Fork a process to execute the job
 
     :param current_job: job, to be executed
@@ -82,8 +108,10 @@ def job_exec_msg_handler(current_job, job_executable,
     :param execution_jobs_pid_dict: dict, storing job_receipt_id:pid pairs
     :param executing_jobs_receipt_ids: set, receipt ids of executing jobs
     :param executing_jobs_begin_times: dict, receipt id: approx begin time
-    :param executed_jobs_receipt_ids: set
-    :param server_ip: str, ip address
+    :param executing_jobs_required_times: dict, receipt id:job required time
+    :param executed_jobs_receipt_ids: manager.dict
+    :param server_ip: str, ip address of server
+    :param self_ip: str, ip address of this machine
     :return: None
     """
     # Make new job directory
@@ -99,27 +127,39 @@ def job_exec_msg_handler(current_job, job_executable,
     with open(execution_dst, 'wb') as file:
         file.write(executable_file_bytes)
 
+    # Book-keeping
+    job_id = current_job.receipt_id
+    executing_jobs_required_times[job_id] = \
+        current_job.time_required - current_job.time_run
+
+    executing_jobs_receipt_ids[current_job.receipt_id] = 0
+    executing_jobs_begin_times[current_job.receipt_id] = time.time()
+
     # Fork, and let the child run the executable
     child_pid = os.fork()
     if child_pid == 0:
         # Child process
+        time.sleep(1)
         job_execution.execute_job(
             current_job, execution_dst, current_job_directory,
-            server_ip=server_ip)
+            execution_jobs_pid_dict, executing_jobs_required_times,
+            executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+            server_ip=server_ip, self_ip=self_ip)
     else:
         # Parent process
         # os.waitpid(child_pid, 0)
         # Do book-keeping
-        executing_jobs_receipt_ids.add(current_job.receipt_id)
-        executing_jobs_begin_times[current_job.receipt_id] = time.time()
-        execution_jobs_pid_dict[current_job.receipt_id] = child_pid
-        executed_jobs_receipt_ids.add(current_job.receipt_id)
+        # execution_jobs_pid_dict[current_job.receipt_id] = child_pid
+        # print('updated', execution_jobs_pid_dict[current_job.receipt_id])
+        pass
 
 
 def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
                                executed_jobs_receipt_ids,
                                executing_jobs_receipt_ids,
-                               executing_jobs_begin_times, server_ip):
+                               executing_jobs_begin_times,
+                               executing_jobs_required_times,
+                               server_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
@@ -128,6 +168,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         done executing
     :param executing_jobs_receipt_ids: set, receipt id of all executing jobs
     :param executing_jobs_begin_times: dict, receipt id: approx begin time
+    :param executing_jobs_required_times: dict, receipt id:job required time
     :param server_ip: str, id address of server
     :return: None
     """
@@ -159,15 +200,17 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
             resend_executed_job_msg(job_receipt_id, server_ip)
     finally:
         # Only for safety, not really required.
-        executed_jobs_receipt_ids.add(job_receipt_id)
+        executed_jobs_receipt_ids[job_receipt_id] = 0
 
     # Now start new job execution
-    job_exec_msg_handler(current_job=new_job, job_executable=new_job_executable,
-                         execution_jobs_pid_dict=execution_jobs_pid_dict,
-                         executing_jobs_receipt_ids=executing_jobs_receipt_ids,
-                         executing_jobs_begin_times=executing_jobs_begin_times,
-                         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-                         server_ip=server_ip)
+    job_exec_msg_handler(
+        current_job=new_job, job_executable=new_job_executable,
+        execution_jobs_pid_dict=execution_jobs_pid_dict,
+        executing_jobs_receipt_ids=executing_jobs_receipt_ids,
+        executing_jobs_begin_times=executing_jobs_begin_times,
+        executing_jobs_required_times=executing_jobs_required_times,
+        executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+        server_ip=server_ip, self_ip=server_ip)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
@@ -181,7 +224,7 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
         done executing
     :param server_ip: str, ip address of server
     """
-    executed_jobs_receipt_ids.add(msg.content.receipt_id)
+    executed_jobs_receipt_ids[msg.content.receipt_id] = 0
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
 
@@ -194,7 +237,7 @@ def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
         executed on this system and have received ack from server
     """
     job_receipt_id = msg.content
-    ack_executed_jobs_receipt_ids.add(job_receipt_id)
+    ack_executed_jobs_receipt_ids[job_receipt_id] = 0
 
 
 def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
@@ -335,7 +378,8 @@ def replay_non_ack_msgs(shared_submitted_jobs_array,
             submit_job(job_id=itr, server_ip=server_ip)
 
     non_ack_executing_jobs = \
-        executed_jobs_receipt_ids - ack_executed_jobs_receipt_ids
+        set(executed_jobs_receipt_ids.keys()) - \
+        set(ack_executed_jobs_receipt_ids.keys())
 
     for receipt_id in non_ack_executing_jobs:
         # Non acknowledged executed job msg, resend message

@@ -87,7 +87,7 @@ from ..messaging.network_params import BUFFER_SIZE
 # from .messaging.network_params import CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
-JOB_ARRAY_SIZE = 50
+JOB_ARRAY_SIZE = 100
 CRASH_ASSUMPTION_TIME = 200
 
 
@@ -152,11 +152,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-serverip", help="IP address of central server",
                         type=str, required=True)
+    parser.add_argument("-ip", help="IP address of this system",
+                        type=str)
     parser.add_argument("-backupip", help="IP address of backup server",
                         type=str)
     args = vars(parser.parse_args())
 
     # Obtain server and backup ip's from the arguments
+    self_ip = args['ip']
     server_ip = args['serverip']
     backup_ip = args['backupip']
 
@@ -170,16 +173,19 @@ def main():
     shared_acknowledged_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
+    manager = mp.Manager()
     # Sets to store all executed and acknowledged executed jobs' receipt ids
-    executed_jobs_receipt_ids = set()
-    ack_executed_jobs_receipt_ids = set()
+    executed_jobs_receipt_ids = manager.dict()
+    ack_executed_jobs_receipt_ids = manager.dict()
     # Set to store receipt id of executing jobs
-    executing_jobs_receipt_ids = set()
+    executing_jobs_receipt_ids = manager.dict()
     # Dict to store execution begin time of executing
-    executing_jobs_begin_times = {}
+    executing_jobs_begin_times = manager.dict()
+    # Dict to store execution required time of executing
+    executing_jobs_required_times = manager.dict()
 
     # Dict to keep job_receipt_id: pid pairs
-    execution_jobs_pid_dict = {}
+    execution_jobs_pid_dict = manager.dict()
     num_execution_jobs_recvd = 0
 
     # Creating new process for job submission interface
@@ -197,13 +203,14 @@ def main():
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
-    # Creating new process for server crash detection
-    process_server_crash_detection = mp.Process(
-        target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
-    )
-
-    # Starting server crash detection process
-    process_server_crash_detection.start()
+    # Server crash detection has been moved to backup
+    # # Creating new process for server crash detection
+    # process_server_crash_detection = mp.Process(
+    #     target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
+    # )
+    #
+    # # Starting server crash detection process
+    # process_server_crash_detection.start()
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
     # Server and child processes connect to this socket
@@ -217,7 +224,6 @@ def main():
     while True:
         # Accept an incoming connection
         connection, client_address = msg_socket.accept()
-
         # Receive the data
         data_list = []
         data = connection.recv(BUFFER_SIZE)
@@ -250,7 +256,10 @@ def main():
             # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time.value = \
                 message_handlers.heartbeat_msg_handler(
-                    shared_job_array, shared_submitted_jobs_array, server_ip)
+                    shared_job_array, shared_submitted_jobs_array,
+                    executing_jobs_receipt_ids, executed_jobs_receipt_ids,
+                    executing_jobs_begin_times, executing_jobs_required_times,
+                    execution_jobs_pid_dict, server_ip)
 
         elif msg.msg_type == 'ACK_JOB_SUBMIT':
             message_handlers.ack_job_submit_msg_handler(
@@ -265,15 +274,25 @@ def main():
                 execution_jobs_pid_dict=execution_jobs_pid_dict,
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
                 executing_jobs_begin_times=executing_jobs_begin_times,
+                executing_jobs_required_times=executing_jobs_required_times,
                 executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-                server_ip=server_ip)
+                server_ip=server_ip, self_ip=self_ip)
+            messageutils.make_and_send_message(msg_type='ACK_JOB_EXEC',
+                                               content=None, file_path=None,
+                                               to=server_ip, msg_socket=None,
+                                               port=CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
             message_handlers.job_preemption_msg_handler(
                 msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
                 executing_jobs_begin_times=executing_jobs_begin_times,
+                executing_jobs_required_times=executing_jobs_required_times,
                 server_ip=server_ip)
+            messageutils.make_and_send_message(msg_type='ACK_JOB_PREEMPT_EXEC',
+                                               content=None, file_path=None,
+                                               to=server_ip, msg_socket=None,
+                                               port=CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'EXECUTED_JOB_TO_PARENT':
             message_handlers.executed_job_to_parent_msg_handler(
