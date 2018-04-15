@@ -160,6 +160,9 @@ def executed_job_handler(job_queue,
         to=received_msg.sender,
         port=SERVER_SEND_PORT,
         msg_socket=None)
+
+    for i in running_jobs[received_msg.sender]:
+        print(i)
     running_jobs[received_msg.sender].remove(executed_job)
 
     if executed_job.completed:

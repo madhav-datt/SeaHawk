@@ -28,7 +28,7 @@ def matchmaking(job, compute_nodes, running_jobs):
             candidates.append(node_id)
 
     # Try to assign a node for the job from the probable candidates
-    if len(candidates) > 0:
+    if len(candidates) > 0 and job.receipt_id <= 2:  # TODO
         # Find the set of idle machines
         idle_machines = []
         for candidate in candidates:
@@ -45,7 +45,10 @@ def matchmaking(job, compute_nodes, running_jobs):
                 if memory_diff < diff_from_max:
                     diff_from_max = memory_diff
                     best_candidate = idle_machine
-            running_jobs[best_candidate].append(job)
+            try:
+                running_jobs[best_candidate].append(job)
+            except KeyError:
+                running_jobs[best_candidate] = [job]
             return best_candidate, None
 
         else:
@@ -55,7 +58,11 @@ def matchmaking(job, compute_nodes, running_jobs):
                 if compute_nodes[idle_machine]['cpu'] < min_cpu_usage:
                     min_cpu_usage = compute_nodes[idle_machine]['cpu']
                     best_candidate = idle_machine
-            running_jobs[best_candidate].append(job)
+            try:
+                running_jobs[best_candidate].append(job)
+            except KeyError:
+                running_jobs[best_candidate] = [job]
+
             return best_candidate, None
 
     else:
@@ -63,8 +70,11 @@ def matchmaking(job, compute_nodes, running_jobs):
         # machine
         lowest_priority_jobs = {}
         for node_id, job_list in running_jobs.items():
-            lowest_priority_jobs[node_id] = min(
-                job_list, key=lambda j: j.priority)
+            try:
+                lowest_priority_jobs[node_id] = min(
+                    job_list, key=lambda j: j.priority)
+            except ValueError:
+                continue
 
         # Out of all the low priority jobs on each machine,
         # Preempt the lowest priority one which satisfies memory constraints
@@ -80,5 +90,8 @@ def matchmaking(job, compute_nodes, running_jobs):
                     best_candidate = node_id
 
         if best_candidate is not None:
-            running_jobs[best_candidate].append(job)
+            try:
+                running_jobs[best_candidate].append(job)
+            except KeyError:
+                running_jobs[best_candidate] = [job]
         return best_candidate, job_to_preempt
