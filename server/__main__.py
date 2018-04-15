@@ -177,7 +177,9 @@ def main():
         running_jobs = server_state.running_jobs
         job_sender = server_state.job_sender
         job_executable = server_state.job_executable
-        job_queue = server_state.job_queue
+        job_queue = priorityqueue.JobQueue()
+        for job in server_state.job_queue:
+            job_queue.put(job)
 
     process_crash_detector = mp.Process(
         target=detect_node_crash, args=(node_last_seen, server_ip,))
