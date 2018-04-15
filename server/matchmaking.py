@@ -24,6 +24,7 @@ def matchmaking(job, compute_nodes, running_jobs):
 
     # Find the set of probable candidates
     for node_id, status in compute_nodes.items():
+        print(node_id, status)
         if status['memory'] >= job.min_memory and status['cpu'] > 20:
             candidates.append(node_id)
 
@@ -45,10 +46,8 @@ def matchmaking(job, compute_nodes, running_jobs):
                 if memory_diff < diff_from_max:
                     diff_from_max = memory_diff
                     best_candidate = idle_machine
-            try:
-                running_jobs[best_candidate].append(job)
-            except KeyError:
-                running_jobs[best_candidate] = [job]
+
+            running_jobs[best_candidate].append(job)
             return best_candidate, None
 
         else:
@@ -58,11 +57,8 @@ def matchmaking(job, compute_nodes, running_jobs):
                 if compute_nodes[idle_machine]['cpu'] < min_cpu_usage:
                     min_cpu_usage = compute_nodes[idle_machine]['cpu']
                     best_candidate = idle_machine
-            try:
-                running_jobs[best_candidate].append(job)
-            except KeyError:
-                running_jobs[best_candidate] = [job]
 
+            running_jobs[best_candidate].append(job)
             return best_candidate, None
 
     else:
@@ -74,13 +70,18 @@ def matchmaking(job, compute_nodes, running_jobs):
                 lowest_priority_jobs[node_id] = min(
                     job_list, key=lambda j: j.priority)
             except ValueError:
+                del lowest_priority_jobs[node_id]
                 continue
 
         # Out of all the low priority jobs on each machine,
         # Preempt the lowest priority one which satisfies memory constraints
-
+        print('THIS IS WHERE THE FUCK UP STARTS')
+        print(compute_nodes)
+        print(running_jobs)
+        print(lowest_priority_jobs)
         job_to_preempt = None
         for node_id, lowest_priority_job in lowest_priority_jobs.items():
+            print(node_id)
             if (job.min_memory <
                     compute_nodes[node_id]['memory'] +
                     lowest_priority_job.min_memory):
@@ -90,8 +91,5 @@ def matchmaking(job, compute_nodes, running_jobs):
                     best_candidate = node_id
 
         if best_candidate is not None:
-            try:
-                running_jobs[best_candidate].append(job)
-            except KeyError:
-                running_jobs[best_candidate] = [job]
+            running_jobs[best_candidate].append(job)
         return best_candidate, job_to_preempt

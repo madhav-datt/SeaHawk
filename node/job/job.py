@@ -73,8 +73,20 @@ class Job:
 
         :return: String representation of job object.
         """
-
         return 'JOB: ' + str(self.submission_id) + ',' + str(self.receipt_id)
 
     def __eq__(self, other):
+        """Job equality comparison based on unique ID assigned by server.
+
+        :param other: Job object
+        :return: Boolean with job equality value
+        """
         return self.receipt_id == other.receipt_id
+
+    def __lt__(self, other):
+        """Job ordering comparison based on job priority.
+
+        :param other: Job object
+        :return: Boolean with job equality value
+        """
+        return self.priority < other.priority
