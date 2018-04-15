@@ -207,7 +207,7 @@ def main():
             if msg_socket is server:
                 # A "readable" server socket is ready to accept a connection
                 connection, client_address = msg_socket.accept()
-                print('New connection from', client_address)
+                # print('New connection from', client_address)
                 inputs.append(connection)
 
             else:
@@ -254,6 +254,7 @@ def main():
                             job_receipt_id=job_receipt_id)
 
                     elif msg.msg_type == 'EXECUTED_JOB':
+                        print('RECV: ' + str(msg.content) + ' ' + str(msg.content.completed))
                         job_queue = message_handlers.executed_job_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
@@ -280,7 +281,7 @@ def main():
                             job_executable=job_executable)
 
                 else:
-                    print('Closing', client_address, 'after reading no data')
+                    # print('Closing', client_address, 'after reading no data')
                     inputs.remove(msg_socket)
                     msg_socket.close()
 
