@@ -40,3 +40,10 @@ class ServerState(object):
         self.running_jobs = running_jobs
         self.job_sender = job_sender
         self.job_executable = job_executable
+
+    def __str__(self):
+        """Custom function to print ServerState details.
+
+        :return: String representation of ServerState object.
+        """
+        return 'SERVER STATE: ' + str(self.compute_nodes)
