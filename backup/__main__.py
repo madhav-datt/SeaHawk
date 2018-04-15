@@ -138,10 +138,8 @@ def main():
             # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time.value = time.time()
             server_state = message_handlers.heartbeat_handler(received_msg=msg)
-            print(server_state)
 
         elif msg.msg_type == 'SERVER_CRASH':
-            print(server_state)
             message_handlers.server_crash_handler(
                 server_state=server_state,
                 crashed_server_ip=server_ip,

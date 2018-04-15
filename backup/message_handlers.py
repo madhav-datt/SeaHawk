@@ -52,8 +52,7 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
     :param nodes_file_path: Absolute path to txt file with IP address, total
         memory of each client/computing node.
     """
-
-    for node_id, status in server_state.computing_nodes.items():
+    for node_id, status in server_state.compute_nodes.items():
         messageutils.make_and_send_message(
             msg_type='I_AM_NEW_SERVER',
             content=None,
@@ -63,8 +62,8 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
             port=SERVER_SEND_PORT)
 
     start_server_command = (
-        'python -m server --server-ip {server_ip} --backup-ip {backup_ip} '
-        '--nodes-file {nodes_file}'.format(
+        'python -m ds-project.server --server-ip {server_ip} --backup-ip '
+        '{backup_ip} --nodes-file {nodes_file}'.format(
             server_ip=backup_ip,
             backup_ip=crashed_server_ip,
             nodes_file=nodes_file_path))
