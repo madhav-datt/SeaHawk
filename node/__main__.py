@@ -115,10 +115,11 @@ def detect_server_crash(shared_last_heartbeat_recv_time):
 
         # Check with last heartbeat time for timeout
         time_since_last_heartbeat = \
-            time.time() - shared_last_heartbeat_recv_time
+            time.time() - shared_last_heartbeat_recv_time.value
         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
             # reset last heartbeat time, with reset time allowance
-            shared_last_heartbeat_recv_time = time.time() + reset_time_allowance
+            shared_last_heartbeat_recv_time.value = time.time() + \
+                                                    reset_time_allowance
 
             # Make and send a crash message to main process which is listening
             # on CLIENT_RECV_PORT for incoming messages
@@ -248,7 +249,7 @@ def main():
         elif msg.msg_type == 'HEARTBEAT':
             # Removing pycharm's annoying unused warning for shared variable
             # noinspection PyUnusedLocal
-            shared_last_heartbeat_recv_time = \
+            shared_last_heartbeat_recv_time.value = \
                 message_handlers.heartbeat_msg_handler(
                     shared_job_array, shared_submitted_jobs_array, server_ip)
 
