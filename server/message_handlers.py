@@ -43,10 +43,12 @@ def heartbeat_from_backup_handler(compute_nodes,
     :param received_msg: message, received message.
     """
 
+    copy_job_queue = copy.copy(job_queue)
+
     server_state = serverstate.ServerState(
         compute_nodes=compute_nodes,
         running_jobs=running_jobs,
-        job_queue=job_queue,
+        job_queue=copy_job_queue,
         job_executable=job_executable,
         job_sender=job_sender)
 

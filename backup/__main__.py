@@ -54,10 +54,12 @@ def detect_server_crash(server_last_seen_time):
 
     while True:
         time.sleep(CRASH_DETECTOR_SLEEP_TIME)
+        print('CHECKING CRASH')
 
         current_time = time.time()
         time_since_last_heartbeat = current_time - server_last_seen_time.value
         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
+            print('NODE CRASHED')
 
             # Make and send a crash message to main process which is listening
             # on SERVER_RECV_PORT for incoming messages.
@@ -126,6 +128,7 @@ def main():
         msg = pickle.loads(data)
         assert isinstance(msg, message.Message), "Received object on socket " \
                                                  "not of type Message."
+        print(msg)
 
         if msg.msg_type == 'HEARTBEAT':
             # TODO: Discuss central server crash between two heartbeats.
