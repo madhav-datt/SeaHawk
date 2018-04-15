@@ -74,5 +74,5 @@ class Job:
         :return: String representation of job object.
         """
 
-        return 'JOB: ' + self.submission_id + ',' + self.receipt_id
+        return 'JOB: ' + str(self.submission_id) + ',' + str(self.receipt_id)
 

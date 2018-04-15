@@ -82,8 +82,9 @@ from .utils import priorityqueue
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
-CRASH_ASSUMPTION_TIME = 20  # seconds
-CRASH_DETECTOR_SLEEP_TIME = 2  # seconds
+CRASH_ASSUMPTION_TIME = 200  # seconds
+CRASH_DETECTOR_SLEEP_TIME = 200  # seconds
+SERVER_START_WAIT_TIME = 5  # seconds
 
 BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
 
@@ -147,7 +148,7 @@ def main():
 
     # In case of backup server taking over on original central server crash
     # gives backup process enough time to terminate
-    time.sleep(CRASH_DETECTOR_SLEEP_TIME)
+    time.sleep(SERVER_START_WAIT_TIME)
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
@@ -188,7 +189,7 @@ def main():
 
     # Binds the socket to the port
     server_address = ('', SERVER_RECV_PORT)
-    print(sys.stderr, 'starting up on %s port %s' % server_address)
+    print('Starting up on %s port %s' % server_address)
     server.bind(server_address)
     server.listen(5)
 
@@ -200,7 +201,7 @@ def main():
     while inputs:
 
         # Wait for at least one of the sockets to be ready for processing
-        print(sys.stderr, '\nwaiting for the next event')
+        print('Waiting for the next event')
         readable, _, _ = select.select(inputs, outputs, inputs)
 
         # Handle inputs
@@ -209,13 +210,20 @@ def main():
             if msg_socket is server:
                 # A "readable" server socket is ready to accept a connection
                 connection, client_address = msg_socket.accept()
-                print(sys.stderr, 'new connection from', client_address)
+                print('New connection from', client_address)
                 connection.setblocking(0)
                 inputs.append(connection)
 
             else:
                 data = msg_socket.recv(BUFFER_SIZE)
                 if data:
+
+                    # data_list = []
+                    # while data:
+                    #     data_list.append(data)
+                    #     data = connection.recv(BUFFER_SIZE)
+                    # data = b''.join(data_list)
+
                     msg = pickle.loads(data)
                     assert isinstance(msg, message.Message), \
                         "Received object on socket not of type Message."
@@ -276,8 +284,7 @@ def main():
                             job_executable=job_executable)
 
                 else:
-                    print(sys.stderr, 'closing', client_address,
-                          'after reading no data')
+                    print('Closing', client_address, 'after reading no data')
                     inputs.remove(msg_socket)
                     msg_socket.close()
 
