@@ -64,7 +64,6 @@ def detect_server_crash(server_last_seen_time, backup_ip):
 
             # Make and send a crash message to main process which is listening
             # on SERVER_RECV_PORT for incoming messages.
-            # TODO: Check if 'to' needs to be changed to socket.gethostname()
             messageutils.make_and_send_message(msg_type='SERVER_CRASH',
                                                content=None,
                                                file_path=None,

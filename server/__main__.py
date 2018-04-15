@@ -112,7 +112,6 @@ def detect_node_crash(node_last_seen, server_ip):
 
         # Make and send a crash message to main process which is listening
         # on SERVER_RECV_PORT for incoming messages.
-        # TODO: Check if 'to' needs to be changed to socket.gethostname()
         if len(crashed_nodes) != 0:
             print('NODE CRASHED')
             messageutils.make_and_send_message(msg_type='NODE_CRASH',
@@ -151,7 +150,7 @@ def main():
 
     # In case of backup server taking over on original central server crash
     # gives backup process enough time to terminate
-    # time.sleep(SERVER_START_WAIT_TIME)  # TODO
+    time.sleep(SERVER_START_WAIT_TIME)
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
@@ -198,7 +197,6 @@ def main():
     # Sockets for reading and writing
     inputs = [server]
     outputs = []
-    client_address = None
 
     while inputs:
 
