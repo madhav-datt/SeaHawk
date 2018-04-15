@@ -48,13 +48,13 @@ class Job:
         self.name = name
         self.username = os.uname()[1]
         self.executable = executable
-        self.priority = priority
-        self.time_required = time_required
+        self.priority = int(priority)
+        self.time_required = int(time_required)
 
         # Requirements
-        self.min_memory = min_memory
-        self.min_cores = min_cores
-        self.max_memory = max_memory
+        self.min_memory = int(min_memory)
+        self.min_cores = int(min_cores)
+        self.max_memory = int(max_memory)
 
         # Job state
         self.time_run = 0

@@ -65,7 +65,7 @@ def ack_job_submit_msg_handler(msg, shared_acknowledged_jobs_array):
         submission has been acknowledged by server
     :return: None
     """
-    ack_job_id = msg.submission_id
+    ack_job_id = msg.content
     shared_acknowledged_jobs_array[ack_job_id] = True
 
 
