@@ -76,13 +76,13 @@ import time
 from . import message_handlers
 from ..messaging import message
 from ..messaging import messageutils
-from .utils import priorityqueue
+from ..utils import priorityqueue
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 BUFFER_SIZE = 1048576
-CRASH_ASSUMPTION_TIME = 200  # seconds
-CRASH_DETECTOR_SLEEP_TIME = 200  # seconds
+CRASH_ASSUMPTION_TIME = 20  # seconds
+CRASH_DETECTOR_SLEEP_TIME = 5  # seconds
 SERVER_START_WAIT_TIME = 5  # seconds
 
 BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
@@ -100,6 +100,7 @@ def detect_node_crash(node_last_seen):
 
     while True:
         time.sleep(CRASH_DETECTOR_SLEEP_TIME)
+        print('CHECKING CRASH')
 
         current_time = time.time()
         crashed_nodes = set()
@@ -112,10 +113,11 @@ def detect_node_crash(node_last_seen):
         # on SERVER_RECV_PORT for incoming messages.
         # TODO: Check if 'to' needs to be changed to socket.gethostname()
         if len(crashed_nodes) != 0:
+            print('NODE CRASHED')
             messageutils.make_and_send_message(msg_type='NODE_CRASH',
                                                content=crashed_nodes,
                                                file_path=None,
-                                               to='127.0.0.1',
+                                               to='10.145.213.142',
                                                msg_socket=None,
                                                port=SERVER_RECV_PORT)
 
@@ -147,7 +149,7 @@ def main():
 
     # In case of backup server taking over on original central server crash
     # gives backup process enough time to terminate
-    time.sleep(SERVER_START_WAIT_TIME)
+    # time.sleep(SERVER_START_WAIT_TIME)  # TODO
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
@@ -240,6 +242,7 @@ def main():
                             message_handlers.heartbeat_handler(
                                 compute_nodes=compute_nodes,
                                 node_last_seen=node_last_seen,
+                                running_jobs=running_jobs,
                                 received_msg=msg)
 
                     elif msg.msg_type == 'JOB_SUBMIT':
@@ -254,7 +257,9 @@ def main():
                             job_receipt_id=job_receipt_id)
 
                     elif msg.msg_type == 'EXECUTED_JOB':
-                        print('RECV: ' + str(msg.content) + ' ' + str(msg.content.completed))
+                        print(
+                            'RECV: ' + str(msg.content) + ' ' +
+                            str(msg.content.completed))
                         job_queue = message_handlers.executed_job_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
@@ -278,6 +283,7 @@ def main():
                             compute_nodes=compute_nodes,
                             running_jobs=running_jobs,
                             job_queue=job_queue,
+                            node_last_seen=node_last_seen,
                             job_executable=job_executable)
 
                 else:

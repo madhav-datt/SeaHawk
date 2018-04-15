@@ -85,14 +85,24 @@ def send_message(msg, to, msg_socket=None, port=PORT):
     msg.sender = msg_socket.getsockname()[0]
     msg_data = io.BytesIO(pickle.dumps(msg))
 
-    while True:
-        chunk = msg_data.read(BUFFER_SIZE)
-        if not chunk:
-            break
-        msg_socket.send(chunk)
+    try:
+        while True:
+            chunk = msg_data.read(BUFFER_SIZE)
+            if not chunk:
+                break
+            msg_socket.send(chunk)
+    except BrokenPipeError:
+        # Connection with end-point broken due to node crash.
+        # Do nothing as crash will be handled by crash detector and handler.
+        pass
 
-    msg_socket.shutdown(socket.SHUT_WR)
-    msg_socket.close()
+    try:
+        msg_socket.shutdown(socket.SHUT_WR)
+        msg_socket.close()
+    except OSError:
+        # Connection with end-point broken due to node crash.
+        # Do nothing as crash will be handled by crash detector and handler.
+        pass
 
 
 def send_heartbeat(to, msg_socket=None, port=PORT):

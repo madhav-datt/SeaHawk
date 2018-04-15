@@ -1,6 +1,9 @@
 """File which does the matchmaking of jobs.
 """
 
+# Minimum CPU availability required
+MIN_CPU_AVAILABILITY = 20
+
 
 def matchmaking(job, compute_nodes, running_jobs):
     """Matchmaking algorithm to pick best compute node for a job.
@@ -24,12 +27,12 @@ def matchmaking(job, compute_nodes, running_jobs):
 
     # Find the set of probable candidates
     for node_id, status in compute_nodes.items():
-        print(node_id, status)
-        if status['memory'] >= job.min_memory and status['cpu'] > 20:
+        if status['memory'] >= job.min_memory and \
+                status['cpu'] > MIN_CPU_AVAILABILITY:
             candidates.append(node_id)
 
     # Try to assign a node for the job from the probable candidates
-    if len(candidates) > 0 and job.receipt_id <= 2:  # TODO
+    if len(candidates) > 0:
         # Find the set of idle machines
         idle_machines = []
         for candidate in candidates:
@@ -75,13 +78,8 @@ def matchmaking(job, compute_nodes, running_jobs):
 
         # Out of all the low priority jobs on each machine,
         # Preempt the lowest priority one which satisfies memory constraints
-        print('THIS IS WHERE THE FUCK UP STARTS')
-        print(compute_nodes)
-        print(running_jobs)
-        print(lowest_priority_jobs)
         job_to_preempt = None
         for node_id, lowest_priority_job in lowest_priority_jobs.items():
-            print(node_id)
             if (job.min_memory <
                     compute_nodes[node_id]['memory'] +
                     lowest_priority_job.min_memory):

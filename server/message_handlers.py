@@ -15,8 +15,8 @@ import time
 from . import matchmaking
 from ..messaging import message
 from ..messaging import messageutils
-from .utils import priorityqueue
-from .utils import serverstate
+from ..utils import priorityqueue
+from ..utils import serverstate
 
 SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
@@ -59,20 +59,29 @@ def heartbeat_from_backup_handler(compute_nodes,
     process_wait_send_heartbeat_to_backup.start()
 
 
-def heartbeat_handler(compute_nodes, node_last_seen, received_msg):
+def heartbeat_handler(compute_nodes, node_last_seen, running_jobs,
+                      received_msg):
     """Handler function for HEARTBEAT messages from compute nodes.
 
     :param compute_nodes: Dictionary with cpu usage and memory of each node
         {node_id: status}
     :param node_last_seen: Dictionary with time when last heartbeat was
         received from node {node_id: last_seen_time}
+    :param running_jobs: Dictionary with jobs running on each system
+        {node_id: [list of jobs]}
     :param received_msg: message, received message.
     """
 
+    # Node has recovered and needs to be added back to node data structures
     # Update compute node available resources
     if received_msg.sender not in compute_nodes:
-        # Node has recovered and needs to be added back to list of nodes
         compute_nodes[received_msg.sender] = {}
+
+    if received_msg.sender not in running_jobs:
+        running_jobs[received_msg.sender] = []
+
+    if received_msg.sender not in node_last_seen:
+        node_last_seen[received_msg.sender] = time.time()
 
     compute_nodes[received_msg.sender]['cpu'] = received_msg.content['cpu']
     compute_nodes[received_msg.sender]['memory'] = \
@@ -215,6 +224,7 @@ def node_crash_handler(compute_nodes,
                        running_jobs,
                        job_queue,
                        job_executable,
+                       node_last_seen,
                        received_msg):
     """Handler function for NODE_CRASH messages.
 
@@ -228,6 +238,8 @@ def node_crash_handler(compute_nodes,
     :param running_jobs: Dictionary with jobs running on each system
         {node_id: [list of jobs]}
     :param job_executable: Dictionary with job executables {job_id: executable}
+    :param node_last_seen: Dictionary with time when last heartbeat was
+        received from node {node_id: last_seen_time}
     :param received_msg: message, received message.
     """
 
@@ -237,6 +249,7 @@ def node_crash_handler(compute_nodes,
     for node_id in crashed_nodes:
         del compute_nodes[node_id]
         del running_jobs[node_id]
+        del node_last_seen[node_id]
 
     for node_id, running_jobs_list in pre_crash_running_jobs.items():
         if node_id in crashed_nodes:
