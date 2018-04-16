@@ -21,7 +21,7 @@ JOB_PICKLE_FILE = '/job.pickle'
 def execute_job(current_job, execution_dst, current_job_directory,
                 execution_jobs_pid_dict, executing_jobs_required_times,
                 executed_jobs_receipt_ids,
-                server_ip, self_ip):
+                server_ip):
     """Execute the executable file, and send submission results to server_ip
 
     :param current_job: job object, to be executed
@@ -31,7 +31,6 @@ def execute_job(current_job, execution_dst, current_job_directory,
     :param executing_jobs_required_times: manager.dict
     :param executed_jobs_receipt_ids: manager.dict
     :param server_ip: str, ip address of server
-    :param self_ip: str, ip address of this system
     :return: None
     """
 
@@ -45,6 +44,7 @@ def execute_job(current_job, execution_dst, current_job_directory,
     job_pickle_file = \
         current_job_directory + JOB_PICKLE_FILE
 
+    # noinspection PyUnusedLocal
     def sigint_handler(signum, frame):
         """Handle sigint signal sent by parent
 
@@ -83,6 +83,7 @@ def execute_job(current_job, execution_dst, current_job_directory,
                                            msg_socket=None,
                                            port=CLIENT_SEND_PORT)
         # Gracefully exit
+        # noinspection PyProtectedMember
         os._exit(0)
 
     # Mask the SIGINT signal with sigint_handler function
