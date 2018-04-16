@@ -73,7 +73,6 @@ def matchmaking(job, compute_nodes, running_jobs):
                 lowest_priority_jobs[node_id] = min(
                     job_list, key=lambda j: j.priority)
             except ValueError:
-                del lowest_priority_jobs[node_id]
                 continue
 
         # Out of all the low priority jobs on each machine,

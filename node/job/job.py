@@ -48,6 +48,7 @@ class Job:
 
         self.submission_id = None
         self.receipt_id = None
+        self.sender = None
         self.name = name
         self.username = os.uname()[1]
         self.executable = executable
@@ -86,7 +87,9 @@ class Job:
         :param other: Job object
         :return: Boolean with job equality value
         """
-        return self.receipt_id == other.receipt_id
+        return (self.receipt_id == other.receipt_id) or (
+                self.submission_id == other.submission_id and
+                self.sender == other.sender and self.sender is not None)
 
     def __lt__(self, other):
         """Job ordering comparison based on job priority.
@@ -95,3 +98,10 @@ class Job:
         :return: Boolean with job equality value
         """
         return self.priority < other.priority
+
+    def __hash__(self):
+        """Makes job objects hashable based on sender assigned details.
+
+        :return: hash values based on tuple (submission_id, sender)
+        """
+        return hash((self.submission_id, self.sender))

@@ -12,6 +12,8 @@ import copy
 import multiprocessing as mp
 import time
 
+import sys
+
 from . import matchmaking
 from ..messaging import message
 from ..messaging import messageutils
@@ -103,18 +105,20 @@ def job_submit_handler(job_queue,
     """
 
     job = received_msg.content
-    for running_job in running_jobs[received_msg.sender]:
-        if job.submission_id == running_job.submission_id:
-            # Executed job was not in running jobs, ie. message is from double
-            # job scheduling due to server crash. Send ACK and ignore message.
-            messageutils.make_and_send_message(
-                msg_type='ACK_JOB_SUBMIT',
-                content=job.submission_id,
-                file_path=None,
-                to=received_msg.sender,
-                port=SERVER_SEND_PORT,
-                msg_socket=None)
-            return
+    job.sender = received_msg.sender
+
+    all_running_jobs = set(sum(running_jobs.values(), []))
+    if job in all_running_jobs:
+        # Executed job was not in running jobs, ie. message is from double
+        # job scheduling due to server crash. Send ACK and ignore message.
+        messageutils.make_and_send_message(
+            msg_type='ACK_JOB_SUBMIT',
+            content=job.submission_id,
+            file_path=None,
+            to=received_msg.sender,
+            port=SERVER_SEND_PORT,
+            msg_socket=None)
+        return
 
     job.receipt_id = job_receipt_id
     job_sender[job_receipt_id] = received_msg.sender
@@ -351,3 +355,5 @@ def schedule_and_send_job(job,
 
     messageutils.send_message(
         msg=job_exec_msg, to=node_for_job, port=SERVER_SEND_PORT)
+
+    print('JOB_EXEC:', job.submission_id, job.receipt_id)
