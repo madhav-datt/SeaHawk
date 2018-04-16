@@ -266,7 +266,8 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
     """
     # Get the job object from message's content field
     current_job = msg.content
-    current_job.submission_completion_time = time.time()
+    current_job.submission_completion_time = time.time() - \
+                                             current_job.submit_time
     submitted_completed_jobs[current_job.submission_id] = current_job
 
     # Update the shared_completed_jobs_array
