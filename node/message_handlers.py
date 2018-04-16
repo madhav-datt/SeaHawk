@@ -64,6 +64,7 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         # time_run = time.time() - executing_jobs_begin_times[job_id]
         executing_child_pid = execution_jobs_pid_dict[job_id]
         time_run = psutil.Process(executing_child_pid).cpu_times()[0]
+        print(time_run)
         if time_run >= executing_jobs_required_times[job_id]:
             try:
                 os.kill(executing_child_pid, signal.SIGTERM)
