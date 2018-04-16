@@ -2,6 +2,7 @@
 
 Includes handlers for:
     * Heartbeat message from server.
+    * Backup update message from server
     * Notification about server crash.
 """
 
@@ -24,15 +25,29 @@ BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
 def heartbeat_handler(received_msg):
     """Handler function for HEARTBEAT messages from server.
 
-    Saves ServerState to pickle file for use when backup needs to take over as
-    central server.
+    Responds by sending a heartbeat to the server.
 
     :param received_msg: message, received message.
     :return: ServerState object received from central server.
     """
 
     messageutils.send_heartbeat(to=received_msg.sender, port=CLIENT_SEND_PORT)
+
+
+def backup_update_handler(received_msg, previous_server_state):
+    """Handler function for BACKUP_UPDATE messages from server
+
+    Saves ServerState to pickle file for use when backup needs to take over as
+    central server.
+
+    :param received_msg: message, received message
+    :param previous_server_state: previous state of the server
+    :return: ServerState updated state of the server
+    """
     server_state = received_msg.content
+    if server_state.state_order < previous_server_state.state_order:
+        server_state = previous_server_state
+
     with open(BACKUP_SERVER_STATE_PATH, 'wb') as server_state_file:
         pickle.dump(server_state, server_state_file)
 

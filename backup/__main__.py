@@ -5,8 +5,9 @@
 
     Messages received from central server:
         - HEARTBEAT: Tells the primary backup that the central server is alive.
-            Includes ServerState object with state of server to be backed up
-            and used in case of central server crash.
+
+        - BACKUP_UPDATE: Includes ServerState object with state of server to be
+            backed up and used in case of central server crash.
 
     Messages received from its own child process:
         - SERVER_CRASH: The backup main receives it from a child process after
@@ -88,6 +89,7 @@ def main():
     backup_ip = args.backup_ip
     server_state = None
 
+
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
@@ -126,11 +128,13 @@ def main():
         print(msg)
 
         if msg.msg_type == 'HEARTBEAT':
-            # TODO: Discuss central server crash between two heartbeats.
-            # Removing pycharm's annoying unused warning for shared variable
-            # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time.value = time.time()
-            server_state = message_handlers.heartbeat_handler(received_msg=msg)
+            message_handlers.heartbeat_handler(received_msg=msg)
+
+        elif msg.msg_type == 'BACKUP_UPDATE':
+            server_state = message_handlers.backup_update_handler(
+                previous_server_state=server_state,
+                received_msg=msg)
 
         elif msg.msg_type == 'SERVER_CRASH':
             message_handlers.server_crash_handler(
