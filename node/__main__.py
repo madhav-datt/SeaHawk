@@ -137,7 +137,7 @@ JOB_ARRAY_SIZE = 100
 
 
 # noinspection PyUnusedLocal
-def sigint_handler(signum=signal.SIGINT.value, frame=None):
+def sigint_handler(signum=signal.SIGINT, frame=None):
     parent_pid = os.getpid()
     try:
         parent = psutil.Process(parent_pid)
