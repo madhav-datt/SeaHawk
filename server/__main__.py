@@ -60,8 +60,10 @@
             sends SUBMITTED_JOB_COMPLETION to submitting node.
 
     Messages sent to backup:
+        - BACKUP_UPDATE: Sent whenever server state data structures are updated.
+            Contains latest ServerState.
         - HEARTBEAT: This is sent in response to the heartbeat of the backup.
-            The heartbeat has the server state as its content.
+            This is used by the backup to detect server crash and take over.
 """
 
 import argparse
@@ -147,6 +149,7 @@ def main():
     time.sleep(SERVER_START_WAIT_TIME)
 
     job_receipt_id = 0  # Unique ID assigned to each job from server.
+    server_state_order = 0  # Sequence ordering of ServerState sent to backup.
     manager = mp.Manager()
     node_last_seen = manager.dict()  # {node_id: last_seen_time}
 
@@ -211,13 +214,7 @@ def main():
 
                     if msg.msg_type == 'HEARTBEAT':
                         if msg.sender == backup_ip:
-                            # Heartbeat to backup server includes server state
                             message_handlers.heartbeat_from_backup_handler(
-                                compute_nodes=compute_nodes,
-                                running_jobs=running_jobs,
-                                job_queue=job_queue,
-                                job_executable=job_executable,
-                                job_sender=job_sender,
                                 received_msg=msg)
 
                         else:
@@ -229,6 +226,7 @@ def main():
 
                     elif msg.msg_type == 'JOB_SUBMIT':
                         job_receipt_id += 1
+                        server_state_order += 1
                         message_handlers.job_submit_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
@@ -236,9 +234,12 @@ def main():
                             job_sender=job_sender,
                             job_executable=job_executable,
                             received_msg=msg,
-                            job_receipt_id=job_receipt_id)
+                            job_receipt_id=job_receipt_id,
+                            backup_ip=backup_ip,
+                            server_state_order=server_state_order)
 
                     elif msg.msg_type == 'EXECUTED_JOB':
+                        server_state_order += 1
                         print(
                             'RECV: ' + str(msg.content) + ' ' +
                             str(msg.content.completed))
@@ -248,6 +249,8 @@ def main():
                             running_jobs=running_jobs,
                             job_sender=job_sender,
                             job_executable=job_executable,
+                            backup_ip=backup_ip,
+                            server_state_order=server_state_order,
                             received_msg=msg)
 
                     elif msg.msg_type == 'ACK_JOB_EXEC':

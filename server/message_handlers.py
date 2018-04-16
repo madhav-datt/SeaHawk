@@ -22,41 +22,17 @@ SERVER_SEND_PORT = 5005
 SERVER_RECV_PORT = 5006
 
 
-def heartbeat_from_backup_handler(compute_nodes,
-                                  running_jobs,
-                                  job_queue,
-                                  job_executable,
-                                  job_sender,
-                                  received_msg):
-    """Handler function for HEARTBEAT messages from backup server.
+def heartbeat_from_backup_handler(received_msg):
+    """Handler function for HEARTBEAT messages from backup server..
 
-    Includes state of central server, in case server crashes and the backup
-    needs to take over.
-
-    :param job_queue: Priority queue for jobs that could not be scheduled.
-    :param compute_nodes: Dictionary with cpu usage and memory of each node
-        {node_id: status}
-    :param running_jobs: Dictionary with jobs running on each system
-        {node_id: [list of jobs]}
-    :param job_sender: Dictionary with initial sender of jobs {job_id: sender}
-    :param job_executable: Dictionary with job executables {job_id: executable}
     :param received_msg: message, received message.
     """
-
-    copy_job_queue = copy.copy(job_queue)
-
-    server_state = serverstate.ServerState(
-        compute_nodes=compute_nodes,
-        running_jobs=running_jobs,
-        job_queue=copy_job_queue,
-        job_executable=job_executable,
-        job_sender=job_sender)
 
     # Send heartbeat message to backup server
     # Creating new process to wait and reply to heartbeat messages
     process_wait_send_heartbeat_to_backup = mp.Process(
         target=messageutils.wait_send_heartbeat_to_backup,
-        args=(received_msg.sender, SERVER_SEND_PORT, server_state,)
+        args=(received_msg.sender, SERVER_SEND_PORT, None,)
     )
     process_wait_send_heartbeat_to_backup.start()
 
@@ -107,7 +83,9 @@ def job_submit_handler(job_queue,
                        received_msg,
                        job_sender,
                        job_executable,
-                       job_receipt_id):
+                       job_receipt_id,
+                       backup_ip,
+                       server_state_order):
     """Handler function for JOB_SUBMIT messages.
 
     :param job_queue: Priority queue for jobs that could not be scheduled.
@@ -119,12 +97,53 @@ def job_submit_handler(job_queue,
     :param job_executable: Dictionary with job executables {job_id: executable}
     :param received_msg: message, received message.
     :param job_receipt_id: int, Unique ID given to the job by server.
+    :param backup_ip: String with IP address of backup server.
+    :param server_state_order: Integer with sequence ordering number of
+        ServerState sent to backup server.
     """
 
     job = received_msg.content
+    for running_job in running_jobs[received_msg.sender]:
+        if job.submission_id == running_job.submission_id:
+            # Executed job was not in running jobs, ie. message is from double
+            # job scheduling due to server crash. Send ACK and ignore message.
+            messageutils.make_and_send_message(
+                msg_type='ACK_JOB_SUBMIT',
+                content=job.submission_id,
+                file_path=None,
+                to=received_msg.sender,
+                port=SERVER_SEND_PORT,
+                msg_socket=None)
+            return
+
     job.receipt_id = job_receipt_id
     job_sender[job_receipt_id] = received_msg.sender
     job_executable[job_receipt_id] = received_msg.file
+
+    schedule_and_send_job(
+        job=job,
+        executable=received_msg.file,
+        job_queue=job_queue,
+        compute_nodes=compute_nodes,
+        running_jobs=running_jobs)
+
+    # Update backup server with changed server state data structures
+    copy_job_queue = copy.copy(job_queue)
+    server_state = serverstate.ServerState(
+        compute_nodes=compute_nodes,
+        running_jobs=running_jobs,
+        job_queue=copy_job_queue,
+        job_executable=job_executable,
+        job_sender=job_sender,
+        state_order=server_state_order)
+
+    messageutils.make_and_send_message(
+        msg_type='BACKUP_UPDATE',
+        content=server_state,
+        file_path=None,
+        to=backup_ip,
+        msg_socket=None,
+        port=SERVER_SEND_PORT)
 
     messageutils.make_and_send_message(
         msg_type='ACK_JOB_SUBMIT',
@@ -134,19 +153,14 @@ def job_submit_handler(job_queue,
         port=SERVER_SEND_PORT,
         msg_socket=None)
 
-    schedule_and_send_job(
-        job=job,
-        executable=received_msg.file,
-        job_queue=job_queue,
-        compute_nodes=compute_nodes,
-        running_jobs=running_jobs)
-
 
 def executed_job_handler(job_queue,
                          compute_nodes,
                          running_jobs,
                          job_sender,
                          job_executable,
+                         server_state_order,
+                         backup_ip,
                          received_msg):
     """Handler function for EXECUTED_JOB messages.
 
@@ -160,22 +174,28 @@ def executed_job_handler(job_queue,
         {node_id: [list of jobs]}
     :param job_sender: Dictionary with initial sender of jobs {job_id: sender}
     :param job_executable: Dictionary with job executables {job_id: executable}
+    :param server_state_order: Integer with sequence ordering number of
+        ServerState sent to backup server.
+    :param backup_ip: String with IP address of backup server.
     :param received_msg: message, received message.
     :returns job_queue: Priority queue for jobs that have not been scheduled.
     """
 
     executed_job = received_msg.content
-    messageutils.make_and_send_message(
-        msg_type='ACK_EXECUTED_JOB',
-        content=executed_job.receipt_id,
-        file_path=None,
-        to=received_msg.sender,
-        port=SERVER_SEND_PORT,
-        msg_socket=None)
+    try:
+        running_jobs[received_msg.sender].remove(executed_job)
+    except ValueError:
+        # Executed job was not in running jobs, ie. message is from double
+        # job scheduling due to server crash. Send ACK and ignore message.
+        messageutils.make_and_send_message(
+            msg_type='ACK_EXECUTED_JOB',
+            content=executed_job.receipt_id,
+            file_path=None,
+            to=received_msg.sender,
+            port=SERVER_SEND_PORT,
+            msg_socket=None)
 
-    for i in running_jobs[received_msg.sender]:
-        print(i)
-    running_jobs[received_msg.sender].remove(executed_job)
+        return job_queue
 
     if executed_job.completed:
 
@@ -213,6 +233,32 @@ def executed_job_handler(job_queue,
             job_queue=job_queue,
             compute_nodes=compute_nodes,
             running_jobs=running_jobs)
+
+    # Update backup server with changed server state data structures
+    copy_job_queue = copy.copy(job_queue)
+    server_state = serverstate.ServerState(
+        compute_nodes=compute_nodes,
+        running_jobs=running_jobs,
+        job_queue=copy_job_queue,
+        job_executable=job_executable,
+        job_sender=job_sender,
+        state_order=server_state_order)
+
+    messageutils.make_and_send_message(
+        msg_type='BACKUP_UPDATE',
+        content=server_state,
+        file_path=None,
+        to=backup_ip,
+        msg_socket=None,
+        port=SERVER_SEND_PORT)
+
+    messageutils.make_and_send_message(
+        msg_type='ACK_EXECUTED_JOB',
+        content=executed_job.receipt_id,
+        file_path=None,
+        to=received_msg.sender,
+        port=SERVER_SEND_PORT,
+        msg_socket=None)
 
     return job_queue
 

@@ -13,10 +13,12 @@ class ServerState(object):
             {node_id: [list of jobs]}
         job_sender: Dictionary with initial sender of jobs {job_id: sender}
         job_executable: Dictionary with job executables {job_id: executable}
+        state_order: Integer with sequence ordering number of ServerState
+            sent to backup server.
     """
 
     def __init__(self, compute_nodes, running_jobs, job_queue, job_executable,
-                 job_sender):
+                 job_sender, state_order):
         """Initializes ServerState class object.
 
         :param job_queue: Priority queue for jobs that could not be scheduled.
@@ -28,9 +30,12 @@ class ServerState(object):
             {job_id: sender}
         :param job_executable: Dictionary with job executables
             {job_id: executable}
+        :param state_order: Integer with sequence ordering number of ServerState
+            sent to backup server.
         """
 
         # Convert from priority queue class JobQueue to a simple list
+        self.state_order = state_order
         self.job_queue = []
         while not job_queue.empty():
             job = job_queue.get()
