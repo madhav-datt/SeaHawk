@@ -87,6 +87,11 @@ def run_submission_interface(newstdin, shared_job_array,
             else:
                 print('Job not submitted.')
 
+        elif command_type == 'HISTORY':
+            job_id = args[0]
+            print(submitted_completed_jobs[job_id].execution_list)
+            print('')
+
         elif command_type == 'STATUS':
             # Print status of all received jobs
             print_status(shared_job_array, shared_submitted_jobs_array,
@@ -217,6 +222,13 @@ def command_parser(command):
         else:
             jobfile_name = command_parts[1]
             return 'SUBMIT', (jobfile_name, )
+    elif command.startswith("history"):
+        command_parts = command.split()
+        if len(command_parts) != 2:
+            return 'IMPROPER COMMAND', ()
+        else:
+            job_id = command_parts[1]
+            return 'HISTORY', (job_id,)
     else:
         return 'IMPROPER COMMAND', ()
 
