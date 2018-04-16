@@ -132,17 +132,11 @@ def main():
         '--backup-ip',
         required=True,
         help='IP address of primary backup server.')
-    parser.add_argument(
-        '--nodes-file',
-        required=True,
-        help='Absolute path to txt file with IP address, total memory of each '
-             'client/computing node.')
     args = parser.parse_args()
     backup_ip = args.backup_ip
     server_ip = args.server_ip
 
     compute_nodes = {}  # {node_id: status}
-    node_list = []
     job_queue = priorityqueue.JobQueue()
     running_jobs = {}  # {node_id: [list of jobs]}
     job_executable = {}  # {job_id: executable}
@@ -155,17 +149,6 @@ def main():
     job_receipt_id = 0  # Unique ID assigned to each job from server.
     manager = mp.Manager()
     node_last_seen = manager.dict()  # {node_id: last_seen_time}
-
-    with open(args.nodes_file) as nodes_ip_file:
-        for node_ip in nodes_ip_file:
-            ip_address, total_memory = node_ip[:-1].split(',')
-            running_jobs[ip_address] = []
-            node_list.append(ip_address)
-            node_last_seen[ip_address] = time.time()
-            compute_nodes[ip_address] = {
-                'cpu': None, 'memory': None, 'last_seen': None,
-                'total_memory': total_memory,
-            }
 
     # Initialize current server state from backup snapshot
     # Used in case primary backup is taking over as central server

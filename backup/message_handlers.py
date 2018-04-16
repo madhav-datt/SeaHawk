@@ -63,9 +63,8 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
 
     start_server_command = (
         'python -m ds-project.server --server-ip {server_ip} --backup-ip '
-        '{backup_ip} --nodes-file {nodes_file}'.format(
+        '{backup_ip}'.format(
             server_ip=backup_ip,
-            backup_ip=crashed_server_ip,
-            nodes_file=nodes_file_path))
+            backup_ip=crashed_server_ip))
     os.system(start_server_command)
     sys.exit()

@@ -82,16 +82,10 @@ def main():
         '--backup-ip',
         required=True,
         help='IP address of primary backup server (this node).')
-    parser.add_argument(
-        '--nodes-file',
-        required=True,
-        help='Absolute path to txt file with IP address, total memory of each '
-             'client/computing node.')
     args = parser.parse_args()
 
     server_ip = args.server_ip
     backup_ip = args.backup_ip
-    nodes_file_path = args.nodes_file
     server_state = None
 
     # Shared variable storing time of last heartbeat receipt, of type float
@@ -142,8 +136,7 @@ def main():
             message_handlers.server_crash_handler(
                 server_state=server_state,
                 crashed_server_ip=server_ip,
-                backup_ip=backup_ip,
-                nodes_file_path=nodes_file_path)
+                backup_ip=backup_ip)
 
 
 if __name__ == '__main__':

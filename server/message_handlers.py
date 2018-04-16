@@ -125,6 +125,7 @@ def job_submit_handler(job_queue,
     job.receipt_id = job_receipt_id
     job_sender[job_receipt_id] = received_msg.sender
     job_executable[job_receipt_id] = received_msg.file
+
     messageutils.make_and_send_message(
         msg_type='ACK_JOB_SUBMIT',
         content=job.submission_id,
