@@ -132,6 +132,9 @@ def job_exec_msg_handler(current_job, job_executable,
     executable_file_bytes = job_executable
     execution_dst = current_job_directory + current_job.get_executable_name()
 
+    while os.path.isfile(execution_dst):
+        execution_dst = execution_dst + '_preempt'
+
     with open(execution_dst, 'wb') as file:
         file.write(executable_file_bytes)
 
@@ -198,6 +201,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     try:
         os.kill(executing_child_pid, signal.SIGTERM)
         time.sleep(5)
+        del executing_jobs_receipt_ids[job_receipt_id]
     except OSError as err:
         if err.errno == errno.ESRCH:
             # ESRCH: child process no longer exists

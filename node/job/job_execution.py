@@ -10,6 +10,7 @@ import pickle
 import signal
 import stat
 import time
+import sys
 import subprocess
 
 from ...messaging import messageutils

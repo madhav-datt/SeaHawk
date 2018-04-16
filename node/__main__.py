@@ -278,6 +278,11 @@ def main():
 
         elif msg.msg_type == 'JOB_EXEC':
             # TODO: See if num_execution_jobs_recvd is useful anywhere
+            new_job_id = msg.content.receipt_id
+            try:
+                del executed_jobs_receipt_ids[new_job_id]
+            except KeyError:
+                pass
             num_execution_jobs_recvd += 1
             message_handlers.job_exec_msg_handler(
                 current_job=msg.content,
