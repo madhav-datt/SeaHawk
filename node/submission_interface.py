@@ -88,7 +88,7 @@ def run_submission_interface(newstdin, shared_job_array,
                 print('Job not submitted.')
 
         elif command_type == 'HISTORY':
-            job_id = args[0]
+            job_id = int(args[0])
             try:
                 print(submitted_completed_jobs[job_id].execution_list)
             except KeyError:
