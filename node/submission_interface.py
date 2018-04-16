@@ -89,8 +89,12 @@ def run_submission_interface(newstdin, shared_job_array,
 
         elif command_type == 'HISTORY':
             job_id = args[0]
-            print(submitted_completed_jobs[job_id].execution_list)
-            print('')
+            try:
+                print(submitted_completed_jobs[job_id].execution_list)
+            except KeyError:
+                pass
+            finally:
+                print('')
 
         elif command_type == 'STATUS':
             # Print status of all received jobs
@@ -168,7 +172,8 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
             total_received_jobs += 1
             try:
                 completion_time = \
-                    submitted_completed_jobs[id_num].submission_completion_time
+                    round(submitted_completed_jobs[id_num].
+                          submission_completion_time)
             except KeyError:
                 completion_time = 'None'
             print('%-10s%-15s%-15s%-15s%-20s'
