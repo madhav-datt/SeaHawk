@@ -15,6 +15,7 @@ import errno
 import os
 import pickle
 import signal
+import psutil
 import time
 
 from .job import job_execution
@@ -29,7 +30,6 @@ JOB_PICKLE_FILE = '/job.pickle'
 
 def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
                           executing_jobs_receipt_ids, executed_jobs_receipt_ids,
-                          executing_jobs_begin_times,
                           executing_jobs_required_times,
                           execution_jobs_pid_dict,
                           server_ip):
@@ -41,7 +41,6 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         to True if job has been submitted to server
     :param executed_jobs_receipt_ids: set, receipt ids of all executed jobs
     :param executing_jobs_receipt_ids: set, receipt ids of all executed/ing jobs
-    :param executing_jobs_begin_times: dict, receipt id:approx begin time
     :param executing_jobs_required_times: dict, receipt id:required time
     :param execution_jobs_pid_dict: dict, receipt id: executing child pid
     :param server_ip: str, ip address of server
@@ -62,9 +61,10 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
 
     for job_id in set(executing_jobs_receipt_ids.keys()) - \
             set(executed_jobs_receipt_ids.keys()):
-        time_run = time.time() - executing_jobs_begin_times[job_id]
+        # time_run = time.time() - executing_jobs_begin_times[job_id]
+        executing_child_pid = execution_jobs_pid_dict[job_id]
+        time_run = psutil.Process(executing_child_pid).cpu_times()[0]
         if time_run >= executing_jobs_required_times[job_id]:
-            executing_child_pid = execution_jobs_pid_dict[job_id]
             try:
                 os.kill(executing_child_pid, signal.SIGTERM)
             except OSError as err:
@@ -100,6 +100,7 @@ def job_exec_msg_handler(current_job, job_executable,
                          executing_jobs_begin_times,
                          executing_jobs_required_times,
                          executed_jobs_receipt_ids,
+                         shared_submission_interface_quit,
                          server_ip):
     """Fork a process to execute the job
 
@@ -110,9 +111,16 @@ def job_exec_msg_handler(current_job, job_executable,
     :param executing_jobs_begin_times: dict, receipt id: approx begin time
     :param executing_jobs_required_times: dict, receipt id:job required time
     :param executed_jobs_receipt_ids: manager.dict
+    :param shared_submission_interface_quit: shared mp.Value
     :param server_ip: str, ip address of server
     :return: None
     """
+    try:
+        _ = executing_jobs_receipt_ids[current_job.receipt_id]
+        return
+    except KeyError:
+        pass
+
     # Make new job directory
     current_job_directory = '%s%d' % (EXECUTING_JOB_DIRECTORY_PREFIX,
                                       current_job.receipt_id)
@@ -138,11 +146,12 @@ def job_exec_msg_handler(current_job, job_executable,
     child_pid = os.fork()
     if child_pid == 0:
         # Child process
-        time.sleep(1)
+        # time.sleep(1)
         job_execution.execute_job(
             current_job, execution_dst, current_job_directory,
             execution_jobs_pid_dict, executing_jobs_required_times,
             executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+            shared_submission_interface_quit=shared_submission_interface_quit,
             server_ip=server_ip)
     else:
         # Parent process
@@ -209,6 +218,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         executing_jobs_begin_times=executing_jobs_begin_times,
         executing_jobs_required_times=executing_jobs_required_times,
         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+        shared_submission_interface_quit=False,
         server_ip=server_ip)
 
 
@@ -240,6 +250,7 @@ def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
 
 
 def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
+                                         submitted_completed_jobs,
                                          server_ip):
     """Handle submitted job completion message recvd from server,
         send ack to server
@@ -247,10 +258,13 @@ def submitted_job_completion_msg_handler(msg, shared_completed_jobs_array,
     :param msg: message, the received message
     :param shared_completed_jobs_array: set, submission ids of all completed
         jobs
+    :param submitted_completed_jobs: list
     :param server_ip: str, id address of server
     """
     # Get the job object from message's content field
     current_job = msg.content
+    current_job.submission_completion_time = time.time()
+    submitted_completed_jobs[current_job.submission_id] = current_job
 
     # Update the shared_completed_jobs_array
     job_submission_id = current_job.submission_id

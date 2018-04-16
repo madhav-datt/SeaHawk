@@ -21,6 +21,7 @@ JOB_PICKLE_FILE = '/job.pickle'
 def execute_job(current_job, execution_dst, current_job_directory,
                 execution_jobs_pid_dict, executing_jobs_required_times,
                 executed_jobs_receipt_ids,
+                shared_submission_interface_quit,
                 server_ip):
     """Execute the executable file, and send submission results to server_ip
 
@@ -30,6 +31,7 @@ def execute_job(current_job, execution_dst, current_job_directory,
     :param execution_jobs_pid_dict: manager.dict
     :param executing_jobs_required_times: manager.dict
     :param executed_jobs_receipt_ids: manager.dict
+    :param shared_submission_interface_quit: mp.Value
     :param server_ip: str, ip address of server
     :return: None
     """
@@ -54,6 +56,11 @@ def execute_job(current_job, execution_dst, current_job_directory,
         :param frame: frame object
         :return: None
         """
+        if shared_submission_interface_quit.value:
+            # Gracefully exit
+            # noinspection PyProtectedMember
+            os._exit(0)
+
         preemption_end_time = time.time()
 
         # Update job run time, completion status

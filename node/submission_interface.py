@@ -28,6 +28,7 @@ def run_submission_interface(newstdin, shared_job_array,
                              executed_jobs_receipt_ids,
                              executing_jobs_receipt_ids,
                              executing_jobs_begin_times,
+                             submitted_completed_jobs,
                              shared_submission_interface_quit):
     """Handle job submission interface.
 
@@ -45,6 +46,7 @@ def run_submission_interface(newstdin, shared_job_array,
     :param executed_jobs_receipt_ids: set
     :param executing_jobs_receipt_ids: set
     :param executing_jobs_begin_times: dict, receipt id:approx begin time
+    :param submitted_completed_jobs: dict
     :param shared_submission_interface_quit: mp.Value c_bool, whether this child
         process has quit.
     :return: None
@@ -90,7 +92,8 @@ def run_submission_interface(newstdin, shared_job_array,
             print_status(shared_job_array, shared_submitted_jobs_array,
                          shared_acknowledged_jobs_array,
                          shared_completed_jobs_array, executed_jobs_receipt_ids,
-                         executing_jobs_receipt_ids, executing_jobs_begin_times)
+                         executing_jobs_receipt_ids, executing_jobs_begin_times,
+                         submitted_completed_jobs)
 
         elif command_type == 'QUIT':
             shared_submission_interface_quit.value = True
@@ -131,7 +134,8 @@ def print_help_message():
 def print_status(shared_job_array, shared_submitted_jobs_array,
                  shared_acknowledged_jobs_array, shared_completed_jobs_array,
                  executed_jobs_receipt_ids,
-                 executing_jobs_receipt_ids, executing_jobs_begin_times):
+                 executing_jobs_receipt_ids, executing_jobs_begin_times,
+                 submitted_completed_jobs):
     """Print the status of all received jobs to terminal.
 
     :param shared_job_array: mp.Array of type bool.
@@ -141,6 +145,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
     :param executed_jobs_receipt_ids: set, receipt ids of executed jobs
     :param executing_jobs_receipt_ids: set
     :param executing_jobs_begin_times: dict, receipt id:approx begin time
+    :param submitted_completed_jobs: dict
     """
     total_received_jobs = 0
 
@@ -149,16 +154,19 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
     print('\nStatus of your jobs')
     print('-' * 20)
-    print('%-10s%-15s%-15s%-15s' % ('JOB ID', 'SUBMITTED',
-                                    'ACKNOWLEDGED', 'COMPLETED'))
+    print('%-10s%-15s%-15s%-15s%-20s' % ('JOB ID', 'SUBMITTED',
+                                         'ACKNOWLEDGED', 'COMPLETED',
+                                         'COMPLETION TIME'))
     for id_num in range(len(shared_job_array)):
         if shared_job_array[id_num]:
             total_received_jobs += 1
-            print('%-10s%-15s%-15s%-15s'
+            print('%-10s%-15s%-15s%-15s%-20s'
                   % (id_num,
                      yn_map(shared_submitted_jobs_array[id_num]),
                      yn_map(shared_acknowledged_jobs_array[id_num]),
-                     yn_map(shared_completed_jobs_array[id_num]),))
+                     yn_map(shared_completed_jobs_array[id_num]),
+                     submitted_completed_jobs[id_num].submission_completion_time
+                     ))
     if total_received_jobs == 0:
         print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))
     else:
@@ -238,7 +246,7 @@ def prepare_job_submission(command_args, num_created_jobs, shared_job_array):
         try:
             current_job = jobfile_parser.make_job(jobfile_path)
             current_job.submission_id = job_id
-
+            current_job.submit_time = time.time()
         except ValueError as job_parse_error:
             print(job_parse_error)
             return False

@@ -21,8 +21,8 @@
             in the content field.
             On receiving a JOB_PREEMPT_EXEC for an already preempted job, if
             ACK_EXECUTED_JOB has been received for that job, then the
-            duplicate JOB_PREEMPT is ignored, otherwise EXECUTED_JOB message
-            is sent again.
+            duplicate JOB_PREEMPT_EXEC is ignored,
+            otherwise EXECUTED_JOB message is sent again.
 
         - ACK_SUBMITTED_JOB_COMPLETION: Sent on receiving
             SUBMITTED_JOB_COMPLETION from server. Content field has receipt id.
@@ -56,10 +56,9 @@
             sends SUBMITTED_JOB_COMPLETION to submitting node
 
     * TODO
-        - Make backup ip required in arg parse.
-        - Test killing of parent process with quit
         - Use cpu run times of processes
         - Add response time, wait time, turnaround time, throughput
+        - Lost ack messages to server -> what happens?
 """
 
 import argparse
@@ -192,6 +191,8 @@ def main():
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = manager.dict()
     num_execution_jobs_recvd = 0
+    # Dict to store all completed submitted jobs
+    submitted_completed_jobs = manager.dict()
 
     # Bool to store whether submission interface child process has quit
     shared_submission_interface_quit = mp.Value(c_bool, False)
@@ -201,7 +202,9 @@ def main():
         args=(newstdin, shared_job_array, shared_submitted_jobs_array,
               shared_acknowledged_jobs_array, shared_completed_jobs_array,
               executed_jobs_receipt_ids, executing_jobs_receipt_ids,
-              executing_jobs_begin_times, shared_submission_interface_quit)
+              executing_jobs_begin_times,
+              submitted_completed_jobs,
+              shared_submission_interface_quit)
     )
 
     # Starting job submission interface process
@@ -242,10 +245,10 @@ def main():
         assert isinstance(msg, Message), "Received object on socket not of" \
                                          "type Message."
 
-        # TODO: Add condition: 'and msg.msg_type != 'I AM NEW SERVER' if needed
         if msg.sender != server_ip and msg.msg_type == 'I_AM_NEW_SERVER':
             # Primary server crash detected by backup server
             # switch primary and backup server ips
+            time.sleep(5)
             server_ip, backup_ip = backup_ip, server_ip
             message_handlers.server_crash_msg_handler(
                 shared_submitted_jobs_array,
@@ -264,7 +267,7 @@ def main():
                 message_handlers.heartbeat_msg_handler(
                     shared_job_array, shared_submitted_jobs_array,
                     executing_jobs_receipt_ids, executed_jobs_receipt_ids,
-                    executing_jobs_begin_times, executing_jobs_required_times,
+                    executing_jobs_required_times,
                     execution_jobs_pid_dict, server_ip)
 
         elif msg.msg_type == 'ACK_JOB_SUBMIT':
@@ -282,6 +285,7 @@ def main():
                 executing_jobs_begin_times=executing_jobs_begin_times,
                 executing_jobs_required_times=executing_jobs_required_times,
                 executed_jobs_receipt_ids=executed_jobs_receipt_ids,
+                shared_submission_interface_quit=shared_submission_interface_quit,
                 server_ip=server_ip)
             messageutils.make_and_send_message(msg_type='ACK_JOB_EXEC',
                                                content=None, file_path=None,
@@ -310,7 +314,8 @@ def main():
 
         elif msg.msg_type == 'SUBMITTED_JOB_COMPLETION':
             message_handlers.submitted_job_completion_msg_handler(
-                msg, shared_completed_jobs_array, server_ip)
+                msg, shared_completed_jobs_array, submitted_completed_jobs,
+                server_ip)
 
         # TODO: Can put condition that if address=server_ip, don't close
         connection.close()

@@ -25,6 +25,9 @@ class Job:
         execution_list: list, containing tuple elements
             (executing machine name, time_run) for each machine that executes
             this job
+        submit_time: time at which job is submitted to central server
+        submission_completion_time: time at which submitting node receives
+            completed job back
     """
 
     def __init__(self, name, executable, priority, time_required, min_memory,
@@ -60,6 +63,8 @@ class Job:
         self.time_run = 0
         self.completed = False
         self.execution_list = []
+        self.submit_time = None
+        self.submission_completion_time = None
 
     def get_executable_name(self):
         """ Return name of the executable file, by parsing the address.
