@@ -13,15 +13,13 @@
             the server immediately after receiving a heartbeat from server.
             Content of the message contains current system resources' status.
             
-        - EXECUTED_JOB: Sent to server on either completing a job execution
-            (EXECUTED_JOB_TO_PARENT received from child, which is forwarded
-            as EXECUTED_JOB to server), or on
-            receiving a JOB_PREEMPT message from server, this main process
-            carries out  the preemption procedure, and sends an
-            EXECUTED_JOB message to the server, with updated job object
+        - EXECUTED_JOB: Sent to server on either completing a job execution,
+            or on receiving a JOB_PREEMPT_EXEC message from server,
+            this main process carries out  the preemption procedure, and
+            sends an EXECUTED_JOB message to the server, with updated job object
             (job.run_time, job.execution_list, job.completed are updated)
             in the content field.
-            On receiving a JOB_PREEMPT for an already preempted job, if
+            On receiving a JOB_PREEMPT_EXEC for an already preempted job, if
             ACK_EXECUTED_JOB has been received for that job, then the
             duplicate JOB_PREEMPT is ignored, otherwise EXECUTED_JOB message
             is sent again.
@@ -29,14 +27,10 @@
         - ACK_SUBMITTED_JOB_COMPLETION: Sent on receiving
             SUBMITTED_JOB_COMPLETION from server. Content field has receipt id.
 
-    Messages received from child processes:
-        - SERVER_CRASH: The child process detects missing heartbeat message
-            for a long time, and sends SERVER_CRASH message to this
-            main process.
+        - ACK_JOB_EXEC: Sent on receiving JOB_EXEC from server.
 
-        - EXECUTED_JOB_TO_PARENT: The child process sends this message to
-            parent on either job completion or preemption. This process (parent)
-            should then forward it as EXECUTED_JOB to the server.
+        - ACK_JOB_PREEMPT_EXEC: Sent on receiving JOB_PREEMPT_EXEC from server.
+
 
     Messages received from server:
         - HEARTBEAT: Server sends this message in response to HEARTBEAT message
@@ -63,9 +57,9 @@
 
     * TODO
         - Make backup ip required in arg parse.
-        - Remove server crash detection process.
-        - Change back crash assumption time
-        - Kill the crash detection process as well with kill
+        - Test killing of parent process with quit
+        - Use cpu run times of processes
+        - Add response time, wait time, turnaround time, throughput
 """
 
 import argparse
@@ -73,8 +67,10 @@ import multiprocessing as mp
 import os.path
 import pickle
 import socket
+import signal
 import sys
 import time
+import psutil
 from ctypes import c_bool
 
 from . import message_handlers
@@ -84,61 +80,74 @@ from ..messaging.message import Message
 from ..messaging.network_params import CLIENT_RECV_PORT
 from ..messaging.network_params import CLIENT_SEND_PORT
 from ..messaging.network_params import BUFFER_SIZE
-# from .messaging.network_params import CRASH_ASSUMPTION_TIME
 
 # Size of shared memory array
 JOB_ARRAY_SIZE = 100
-CRASH_ASSUMPTION_TIME = 200
 
 
-def detect_server_crash(shared_last_heartbeat_recv_time):
-    """Run as a child process, periodically checking last heartbeat time.
+# Server crash detection is no longer under use
 
-    :param shared_last_heartbeat_recv_time: shared mp.Value, float type
-    :return: None
-    """
+# def detect_server_crash(shared_last_heartbeat_recv_time):
+#     """Run as a child process, periodically checking last heartbeat time.
+#
+#     :param shared_last_heartbeat_recv_time: shared mp.Value, float type
+#     :return: None
+#     """
+#
+#     # When a server crash detected, shared_last_heartbeat_recv_time is
+#     # set to time.time() + reset_time_allowance, to account for reset time.
+#     reset_time_allowance = 5.
+#
+#     # Time to sleep in between checks, adaptive in nature
+#     sleep_time = 5
+#
+#     # sleep_time will be set to (1 + sleep_time_additive)* (remaining timeout)
+#     # should be strictly greater than 0
+#     sleep_time_additive = 0.1
+#
+#     while True:
+#         # Sleep for some time
+#         time.sleep(sleep_time)
+#
+#         # Check with last heartbeat time for timeout
+#         time_since_last_heartbeat = \
+#             time.time() - shared_last_heartbeat_recv_time.value
+#         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
+#             # reset last heartbeat time, with reset time allowance
+#             shared_last_heartbeat_recv_time.value = time.time() + \
+#                                                     reset_time_allowance
+#
+#             # Make and send a crash message to main process which is listening
+#             # on CLIENT_RECV_PORT for incoming messages
+#             # TODO: Check if 'to' needs to be changed to socket.gethostname()
+#             messageutils.make_and_send_message(
+#                 msg_type='SERVER_CRASH',
+#                 content=None,
+#                 file_path=None,
+#                 to='127.0.0.1',
+#                 msg_socket=None,
+#                 port=CLIENT_RECV_PORT)
+#
+#             # Reset sleep time to the time for reset allowance
+#             sleep_time = reset_time_allowance
+#         else:
+#             # sleep time updated adaptively
+#             remaining_timeout = \
+#                 CRASH_ASSUMPTION_TIME - time_since_last_heartbeat
+#             sleep_time = remaining_timeout * (1 + sleep_time_additive)
 
-    # When a server crash detected, shared_last_heartbeat_recv_time is
-    # set to time.time() + reset_time_allowance, to account for reset time.
-    reset_time_allowance = 5.
 
-    # Time to sleep in between checks, adaptive in nature
-    sleep_time = 5
-
-    # sleep_time will be set to (1 + sleep_time_additive)* (remaining timeout)
-    # should be strictly greater than 0
-    sleep_time_additive = 0.1
-
-    while True:
-        # Sleep for some time
-        time.sleep(sleep_time)
-
-        # Check with last heartbeat time for timeout
-        time_since_last_heartbeat = \
-            time.time() - shared_last_heartbeat_recv_time.value
-        if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
-            # reset last heartbeat time, with reset time allowance
-            shared_last_heartbeat_recv_time.value = time.time() + \
-                                                    reset_time_allowance
-
-            # Make and send a crash message to main process which is listening
-            # on CLIENT_RECV_PORT for incoming messages
-            # TODO: Check if 'to' needs to be changed to socket.gethostname()
-            messageutils.make_and_send_message(
-                msg_type='SERVER_CRASH',
-                content=None,
-                file_path=None,
-                to='127.0.0.1',
-                msg_socket=None,
-                port=CLIENT_RECV_PORT)
-
-            # Reset sleep time to the time for reset allowance
-            sleep_time = reset_time_allowance
-        else:
-            # sleep time updated adaptively
-            remaining_timeout = \
-                CRASH_ASSUMPTION_TIME - time_since_last_heartbeat
-            sleep_time = remaining_timeout * (1 + sleep_time_additive)
+# noinspection PyUnusedLocal
+def sigint_handler(signum=signal.SIGINT.value, frame=None):
+    parent_pid = os.getpid()
+    try:
+        parent = psutil.Process(parent_pid)
+    except psutil.NoSuchProcess:
+        return
+    children = parent.children(recursive=True)
+    for process in children:
+        process.send_signal(signal.SIGTERM)
+    sys.exit(0)
 
 
 def main():
@@ -152,14 +161,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-serverip", help="IP address of central server",
                         type=str, required=True)
-    parser.add_argument("-ip", help="IP address of this system",
-                        type=str)
     parser.add_argument("-backupip", help="IP address of backup server",
                         type=str)
     args = vars(parser.parse_args())
 
     # Obtain server and backup ip's from the arguments
-    self_ip = args['ip']
     server_ip = args['serverip']
     backup_ip = args['backupip']
 
@@ -174,27 +180,28 @@ def main():
     shared_completed_jobs_array = mp.Array(c_bool, JOB_ARRAY_SIZE)
 
     manager = mp.Manager()
-    # Sets to store all executed and acknowledged executed jobs' receipt ids
+    # Set-Dict to store all executed and acknowledged executed jobs' receipt ids
     executed_jobs_receipt_ids = manager.dict()
     ack_executed_jobs_receipt_ids = manager.dict()
-    # Set to store receipt id of executing jobs
+    # Set-Dict to store receipt id of executing jobs
     executing_jobs_receipt_ids = manager.dict()
     # Dict to store execution begin time of executing
     executing_jobs_begin_times = manager.dict()
     # Dict to store execution required time of executing
     executing_jobs_required_times = manager.dict()
-
     # Dict to keep job_receipt_id: pid pairs
     execution_jobs_pid_dict = manager.dict()
     num_execution_jobs_recvd = 0
 
+    # Bool to store whether submission interface child process has quit
+    shared_submission_interface_quit = mp.Value(c_bool, False)
     # Creating new process for job submission interface
     process_submission_interface = mp.Process(
         target=submission_interface.run_submission_interface,
         args=(newstdin, shared_job_array, shared_submitted_jobs_array,
               shared_acknowledged_jobs_array, shared_completed_jobs_array,
               executed_jobs_receipt_ids, executing_jobs_receipt_ids,
-              executing_jobs_begin_times)
+              executing_jobs_begin_times, shared_submission_interface_quit)
     )
 
     # Starting job submission interface process
@@ -203,14 +210,8 @@ def main():
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
-    # Server crash detection has been moved to backup
-    # # Creating new process for server crash detection
-    # process_server_crash_detection = mp.Process(
-    #     target=detect_server_crash, args=(shared_last_heartbeat_recv_time,)
-    # )
-    #
-    # # Starting server crash detection process
-    # process_server_crash_detection.start()
+    # Mask SIGINT for cleanup with killing all child processes
+    signal.signal(signal.SIGINT, sigint_handler)
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
     # Server and child processes connect to this socket
@@ -224,6 +225,11 @@ def main():
     while True:
         # Accept an incoming connection
         connection, client_address = msg_socket.accept()
+
+        # Check if user wants to quit
+        if shared_submission_interface_quit.value:
+            sigint_handler()
+
         # Receive the data
         data_list = []
         data = connection.recv(BUFFER_SIZE)
@@ -276,7 +282,7 @@ def main():
                 executing_jobs_begin_times=executing_jobs_begin_times,
                 executing_jobs_required_times=executing_jobs_required_times,
                 executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-                server_ip=server_ip, self_ip=self_ip)
+                server_ip=server_ip)
             messageutils.make_and_send_message(msg_type='ACK_JOB_EXEC',
                                                content=None, file_path=None,
                                                to=server_ip, msg_socket=None,
