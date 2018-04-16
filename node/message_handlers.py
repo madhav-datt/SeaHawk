@@ -168,6 +168,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
                                executing_jobs_receipt_ids,
                                executing_jobs_begin_times,
                                executing_jobs_required_times,
+                               shared_submission_interface_quit,
                                server_ip):
     """Handle receive of job preemption message
 
@@ -178,6 +179,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     :param executing_jobs_receipt_ids: set, receipt id of all executing jobs
     :param executing_jobs_begin_times: dict, receipt id: approx begin time
     :param executing_jobs_required_times: dict, receipt id:job required time
+    :param shared_submission_interface_quit: Mp.value
     :param server_ip: str, id address of server
     :return: None
     """
@@ -219,7 +221,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         executing_jobs_begin_times=executing_jobs_begin_times,
         executing_jobs_required_times=executing_jobs_required_times,
         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-        shared_submission_interface_quit=False,
+        shared_submission_interface_quit=shared_submission_interface_quit,
         server_ip=server_ip)
 
 

@@ -300,6 +300,7 @@ def main():
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
                 executing_jobs_begin_times=executing_jobs_begin_times,
                 executing_jobs_required_times=executing_jobs_required_times,
+                shared_submission_interface_quit=shared_submission_interface_quit,
                 server_ip=server_ip)
             messageutils.make_and_send_message(msg_type='ACK_JOB_PREEMPT_EXEC',
                                                content=None, file_path=None,
