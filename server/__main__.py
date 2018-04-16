@@ -222,6 +222,11 @@ def main():
                                 compute_nodes=compute_nodes,
                                 node_last_seen=node_last_seen,
                                 running_jobs=running_jobs,
+                                job_queue=job_queue,
+                                job_sender=job_sender,
+                                job_executable=job_executable,
+                                backup_ip=backup_ip,
+                                server_state_order=server_state_order,
                                 received_msg=msg)
 
                     elif msg.msg_type == 'JOB_SUBMIT':
