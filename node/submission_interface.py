@@ -27,7 +27,8 @@ def run_submission_interface(newstdin, shared_job_array,
                              shared_completed_jobs_array,
                              executed_jobs_receipt_ids,
                              executing_jobs_receipt_ids,
-                             executing_jobs_begin_times):
+                             executing_jobs_begin_times,
+                             shared_submission_interface_quit):
     """Handle job submission interface.
 
     Child process forked from main, with shared data array.
@@ -44,6 +45,8 @@ def run_submission_interface(newstdin, shared_job_array,
     :param executed_jobs_receipt_ids: set
     :param executing_jobs_receipt_ids: set
     :param executing_jobs_begin_times: dict, receipt id:approx begin time
+    :param shared_submission_interface_quit: mp.Value c_bool, whether this child
+        process has quit.
     :return: None
 
     """
@@ -90,6 +93,7 @@ def run_submission_interface(newstdin, shared_job_array,
                          executing_jobs_receipt_ids, executing_jobs_begin_times)
 
         elif command_type == 'QUIT':
+            shared_submission_interface_quit.value = True
             # noinspection PyProtectedMember
             os._exit(0)
 
@@ -170,7 +174,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
     for id_num in executing_jobs_receipt_ids.keys():
         total_executing_jobs += 1
         if id_num in set(executed_jobs_receipt_ids.keys()):
-            print('%-20s%-15s' % (id_num, 'Completed'))
+            print('%-20s%-15s' % (id_num, 'completed'))
         else:
             exec_time = round(current_time - executing_jobs_begin_times[id_num])
             print('%-20s%-15s' % (id_num, exec_time))

@@ -100,7 +100,7 @@ def job_exec_msg_handler(current_job, job_executable,
                          executing_jobs_begin_times,
                          executing_jobs_required_times,
                          executed_jobs_receipt_ids,
-                         server_ip, self_ip):
+                         server_ip):
     """Fork a process to execute the job
 
     :param current_job: job, to be executed
@@ -111,7 +111,6 @@ def job_exec_msg_handler(current_job, job_executable,
     :param executing_jobs_required_times: dict, receipt id:job required time
     :param executed_jobs_receipt_ids: manager.dict
     :param server_ip: str, ip address of server
-    :param self_ip: str, ip address of this machine
     :return: None
     """
     # Make new job directory
@@ -144,7 +143,7 @@ def job_exec_msg_handler(current_job, job_executable,
             current_job, execution_dst, current_job_directory,
             execution_jobs_pid_dict, executing_jobs_required_times,
             executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-            server_ip=server_ip, self_ip=self_ip)
+            server_ip=server_ip)
     else:
         # Parent process
         # os.waitpid(child_pid, 0)
@@ -210,7 +209,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         executing_jobs_begin_times=executing_jobs_begin_times,
         executing_jobs_required_times=executing_jobs_required_times,
         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
-        server_ip=server_ip, self_ip=server_ip)
+        server_ip=server_ip)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
