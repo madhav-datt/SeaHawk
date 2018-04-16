@@ -45,7 +45,8 @@ def backup_update_handler(received_msg, previous_server_state):
     :return: ServerState updated state of the server
     """
     server_state = received_msg.content
-    if server_state.state_order < previous_server_state.state_order:
+    if previous_server_state is not None and \
+            server_state.state_order < previous_server_state.state_order:
         server_state = previous_server_state
 
     with open(BACKUP_SERVER_STATE_PATH, 'wb') as server_state_file:
@@ -54,8 +55,7 @@ def backup_update_handler(received_msg, previous_server_state):
     return server_state
 
 
-def server_crash_handler(server_state, crashed_server_ip, backup_ip,
-                         nodes_file_path):
+def server_crash_handler(server_state, crashed_server_ip, backup_ip):
     """Handler function for SERVER_CRASH messages from crash detector.
 
     Informs all computing nodes about new server, takes over as central server,
@@ -64,8 +64,6 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
     :param server_state: ServerState with last known state of central server.
     :param crashed_server_ip: String with IP address of crashed central server.
     :param backup_ip: String with IP address of primary backup (this node).
-    :param nodes_file_path: Absolute path to txt file with IP address, total
-        memory of each client/computing node.
     """
     for node_id, status in server_state.compute_nodes.items():
         messageutils.make_and_send_message(
