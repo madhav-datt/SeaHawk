@@ -268,7 +268,9 @@ def main():
                     shared_job_array, shared_submitted_jobs_array,
                     executing_jobs_receipt_ids, executed_jobs_receipt_ids,
                     executing_jobs_required_times,
-                    execution_jobs_pid_dict, server_ip)
+                    executing_jobs_begin_times,
+                    execution_jobs_pid_dict,
+                    server_ip)
 
         elif msg.msg_type == 'ACK_JOB_SUBMIT':
             message_handlers.ack_job_submit_msg_handler(

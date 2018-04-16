@@ -31,6 +31,7 @@ JOB_PICKLE_FILE = '/job.pickle'
 def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
                           executing_jobs_receipt_ids, executed_jobs_receipt_ids,
                           executing_jobs_required_times,
+                          executing_jobs_begin_times,
                           execution_jobs_pid_dict,
                           server_ip):
     """Scan job_array for jobs queued up for submission, send to server.
@@ -62,11 +63,11 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
     for job_id in set(executing_jobs_receipt_ids.keys()) - \
             set(executed_jobs_receipt_ids.keys()):
         # time_run = time.time() - executing_jobs_begin_times[job_id]
-        executing_child_pid = execution_jobs_pid_dict[job_id]
-        time_run = psutil.Process(executing_child_pid).cpu_times()[0]
-        print(time_run)
+        time_run = time.time() - executing_jobs_begin_times[job_id]
         if time_run >= executing_jobs_required_times[job_id]:
             try:
+                executing_child_pid = execution_jobs_pid_dict[job_id]
+                print(executing_child_pid)
                 os.kill(executing_child_pid, signal.SIGTERM)
             except OSError as err:
                 if err.errno == errno.ESRCH:
