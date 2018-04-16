@@ -67,7 +67,6 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         if time_run >= executing_jobs_required_times[job_id]:
             try:
                 executing_child_pid = execution_jobs_pid_dict[job_id]
-                print(executing_child_pid)
                 os.kill(executing_child_pid, signal.SIGTERM)
             except OSError as err:
                 if err.errno == errno.ESRCH:
