@@ -39,7 +39,8 @@ def heartbeat_from_backup_handler(received_msg):
     process_wait_send_heartbeat_to_backup.start()
 
 
-def heartbeat_handler(compute_nodes, node_last_seen, running_jobs,
+def heartbeat_handler(compute_nodes, node_last_seen, running_jobs, job_queue,
+                      job_executable, job_sender, server_state_order, backup_ip,
                       received_msg):
     """Handler function for HEARTBEAT messages from compute nodes.
 
@@ -49,6 +50,12 @@ def heartbeat_handler(compute_nodes, node_last_seen, running_jobs,
         received from node {node_id: last_seen_time}
     :param running_jobs: Dictionary with jobs running on each system
         {node_id: [list of jobs]}
+    :param job_queue: Priority queue for jobs that could not be scheduled.
+    :param job_sender: Dictionary with initial sender of jobs {job_id: sender}
+    :param job_executable: Dictionary with job executables {job_id: executable}
+    :param backup_ip: String with IP address of backup server.
+    :param server_state_order: Integer with sequence ordering number of
+        ServerState sent to backup server.
     :param received_msg: message, received message.
     """
 
@@ -69,6 +76,39 @@ def heartbeat_handler(compute_nodes, node_last_seen, running_jobs,
     compute_nodes[received_msg.sender]['last_seen'] = time.time()
     node_last_seen[received_msg.sender] = \
         compute_nodes[received_msg.sender]['last_seen']
+
+    # Schedule jobs in job_queue, if possible.
+
+    # List of jobs in job_queue that could not be scheduled
+    wait_queue = priorityqueue.JobQueue()
+    while not job_queue.empty():
+        job = job_queue.get()
+        schedule_and_send_job(
+            job=job,
+            executable=job_executable[job.receipt_id],
+            job_queue=wait_queue,
+            compute_nodes=compute_nodes,
+            running_jobs=running_jobs)
+
+    job_queue = wait_queue
+
+    # Update backup server with changed server state data structures
+    copy_job_queue = copy.copy(job_queue)
+    server_state = serverstate.ServerState(
+        compute_nodes=compute_nodes,
+        running_jobs=running_jobs,
+        job_queue=copy_job_queue,
+        job_executable=job_executable,
+        job_sender=job_sender,
+        state_order=server_state_order)
+
+    messageutils.make_and_send_message(
+        msg_type='BACKUP_UPDATE',
+        content=server_state,
+        file_path=None,
+        to=backup_ip,
+        msg_socket=None,
+        port=SERVER_SEND_PORT)
 
     # Send heartbeat message to computing node
     # Creating new process to wait and reply to heartbeat messages

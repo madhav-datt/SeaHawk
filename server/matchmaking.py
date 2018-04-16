@@ -33,7 +33,8 @@ def matchmaking(job, compute_nodes, running_jobs):
             candidates.append(node_id)
 
     # Try to assign a node for the job from the probable candidates
-    if len(candidates) > 0:
+    if job.receipt_id == 1:  # For testing preemption with single node.
+    # if len(candidates) > 0:
         # Find the set of idle machines
         idle_machines = []
         for candidate in candidates:
@@ -62,7 +63,11 @@ def matchmaking(job, compute_nodes, running_jobs):
                     max_cpu_available = compute_nodes[node_id]['cpu']
                     best_candidate = node_id
 
-            running_jobs[best_candidate].append(job)
+            try:
+                running_jobs[best_candidate].append(job)
+            except KeyError:
+                # All nodes have crashed. The job can not be scheduled.
+                best_candidate = None
             return best_candidate, None
 
     else:
