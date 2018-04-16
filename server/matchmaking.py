@@ -3,6 +3,7 @@
 
 # Minimum CPU availability required
 MIN_CPU_AVAILABILITY = 20
+IDLE_MACHINE_JOB_COUNT = 4
 
 
 def matchmaking(job, compute_nodes, running_jobs):
@@ -36,7 +37,7 @@ def matchmaking(job, compute_nodes, running_jobs):
         # Find the set of idle machines
         idle_machines = []
         for candidate in candidates:
-            if len(running_jobs[candidate]) == 0:
+            if len(running_jobs[candidate]) <= IDLE_MACHINE_JOB_COUNT:
                 idle_machines.append(candidate)
 
         # Choose one of the idle machines based on max memory preference
