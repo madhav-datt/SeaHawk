@@ -58,6 +58,9 @@ def run_submission_interface(newstdin, shared_job_array,
     # Keep track of all created jobs, also used to index directory names - which
     # store job files
     num_created_jobs = 0
+    while os.path.isdir(SUBMITTED_JOB_DIRECTORY_PREFIX + str(
+                    num_created_jobs+1)):
+        num_created_jobs += 1
 
     # keep looping and accepting jobs
     while True:

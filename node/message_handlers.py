@@ -197,6 +197,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     # sigint_handler will send EXECUTED_JOB to central server
     try:
         os.kill(executing_child_pid, signal.SIGTERM)
+        time.sleep(5)
     except OSError as err:
         if err.errno == errno.ESRCH:
             # ESRCH: child process no longer exists

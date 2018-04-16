@@ -81,7 +81,7 @@ from ..messaging.network_params import CLIENT_SEND_PORT
 from ..messaging.network_params import BUFFER_SIZE
 
 # Size of shared memory array
-JOB_ARRAY_SIZE = 100
+JOB_ARRAY_SIZE = 200
 
 
 # Server crash detection is no longer under use
