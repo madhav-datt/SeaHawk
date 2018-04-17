@@ -85,13 +85,11 @@ def execute_job(current_job, execution_dst, current_job_directory,
 
         # Prepare and send executed job information message to parent
         executed_jobs_receipt_ids[job_id] = 0
-        print('sending to self')
         messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
                                            content=current_job,
                                            file_path=None, to=self_ip,
                                            msg_socket=None,
                                            port=CLIENT_RECV_PORT)
-        print('done sending to self')
         # Gracefully exit
         # noinspection PyProtectedMember
         os._exit(0)
@@ -129,10 +127,8 @@ def execute_job(current_job, execution_dst, current_job_directory,
     # Prepare and send job completion message to parent
     # executed_jobs_receipt_ids[job_id] = 0
     executed_jobs_receipt_ids[job_id] = 0
-    print('sending to self')
     messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
                                        content=current_job,
                                        file_path=None, to=self_ip,
                                        msg_socket=None,
                                        port=CLIENT_RECV_PORT)
-    print('done sending to self')

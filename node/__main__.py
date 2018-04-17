@@ -218,7 +218,7 @@ def main():
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
     # Mask SIGINT for cleanup with killing all child processes
-    # signal.signal(signal.SIGINT, sigint_handler)
+    signal.signal(signal.SIGINT, sigint_handler)
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
     # Server and child processes connect to this socket
@@ -287,6 +287,7 @@ def main():
                 del executed_jobs_receipt_ids[new_job_id]
             except KeyError:
                 pass
+
             num_execution_jobs_recvd += 1
             message_handlers.job_exec_msg_handler(
                 current_job=msg.content,

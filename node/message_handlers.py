@@ -59,14 +59,19 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
             shared_submitted_jobs_array[itr] = True
             # TODO: Add log entry here
 
+    itr = 0
     for job_id in set(executing_jobs_receipt_ids.keys()) - \
             set(executed_jobs_receipt_ids.keys()):
+        if itr >= 2:
+            break
         # time_run = time.time() - executing_jobs_begin_times[job_id]
         time_run = time.time() - executing_jobs_begin_times[job_id]
         if time_run >= executing_jobs_required_times[job_id]:
             try:
                 executing_child_pid = execution_jobs_pid_dict[job_id]
                 os.kill(executing_child_pid, signal.SIGTERM)
+                time.sleep(3)
+                itr += 1
             except OSError as err:
                 if err.errno == errno.ESRCH:
                     # ESRCH: child process no longer exists
@@ -74,7 +79,6 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
             finally:
                 # Only for safety, not really required.
                 executed_jobs_receipt_ids[job_id] = 0
-            break
 
     # Send heartbeat back to the server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
