@@ -54,7 +54,7 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
         if shared_job_array[itr] and not shared_submitted_jobs_array[itr]:
             # Submit job to server
             submit_job(job_id=itr, server_ip=server_ip)
-            print('Submitted job s_id = %d to server\n\n>>>' % itr)
+            print('Submitted job s_id = %d to server\n\n>>>' % itr, end=' ')
             # Update shared_submitted_jobs_array
             shared_submitted_jobs_array[itr] = True
             # TODO: Add log entry here
@@ -252,7 +252,8 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
     executed_jobs_receipt_ids[msg.content.receipt_id] = 0
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
-    print('Sending executed job r_id=%d' % msg.content.receipt_id)
+    print('Sending executed job r_id=%d\n\n>>>' % msg.content.receipt_id,
+          end=' ')
 
 
 def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
@@ -405,7 +406,7 @@ def replay_non_ack_msgs(shared_submitted_jobs_array,
         if elem and not shared_acknowledged_jobs_array[itr]:
             # Non acknowledged job submission, resend job
             print('Replaying non-acked SUBMIT_JOB for job s_id =', itr,
-                  '\n\n>>>')
+                  '\n\n>>>', end=' ')
             submit_job(job_id=itr, server_ip=server_ip)
 
     non_ack_executing_jobs = \
@@ -415,5 +416,5 @@ def replay_non_ack_msgs(shared_submitted_jobs_array,
     for receipt_id in non_ack_executing_jobs:
         # Non acknowledged executed job msg, resend message
         print('Replaying non-acked EXECUTED_JOB for job r_id =', receipt_id,
-              '\n\n>>>')
+              '\n\n>>>', end=' ')
         resend_executed_job_msg(job_receipt_id=receipt_id, server_ip=server_ip)
