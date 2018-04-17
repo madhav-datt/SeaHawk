@@ -9,8 +9,10 @@ Includes handlers for:
 import os
 import pickle
 import sys
+import signal
 
 from ..messaging import messageutils
+
 
 CLIENT_RECV_PORT = 5005
 CLIENT_SEND_PORT = 5006
@@ -45,7 +47,8 @@ def backup_update_handler(received_msg, previous_server_state):
     :return: ServerState updated state of the server
     """
     server_state = received_msg.content
-    if server_state.state_order < previous_server_state.state_order:
+    if previous_server_state is not None and \
+            server_state.state_order < previous_server_state.state_order:
         server_state = previous_server_state
 
     with open(BACKUP_SERVER_STATE_PATH, 'wb') as server_state_file:
@@ -54,8 +57,8 @@ def backup_update_handler(received_msg, previous_server_state):
     return server_state
 
 
-def server_crash_handler(server_state, crashed_server_ip, backup_ip,
-                         nodes_file_path):
+def server_crash_handler(server_state, crashed_server_ip, backup_ip, child_pid,
+                         socket_to_close):
     """Handler function for SERVER_CRASH messages from crash detector.
 
     Informs all computing nodes about new server, takes over as central server,
@@ -64,9 +67,10 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
     :param server_state: ServerState with last known state of central server.
     :param crashed_server_ip: String with IP address of crashed central server.
     :param backup_ip: String with IP address of primary backup (this node).
-    :param nodes_file_path: Absolute path to txt file with IP address, total
-        memory of each client/computing node.
+    :param child_pid: pid of child process
+    :param socket_to_close: socket to be closed
     """
+    os.kill(child_pid, signal.SIGTERM)
     for node_id, status in server_state.compute_nodes.items():
         messageutils.make_and_send_message(
             msg_type='I_AM_NEW_SERVER',
@@ -76,6 +80,7 @@ def server_crash_handler(server_state, crashed_server_ip, backup_ip,
             msg_socket=None,
             port=SERVER_SEND_PORT)
 
+    socket_to_close.close()
     start_server_command = (
         'python -m ds-project.server --server-ip {server_ip} --backup-ip '
         '{backup_ip}'.format(
