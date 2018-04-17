@@ -165,6 +165,7 @@ def main():
             node_last_seen[node_id] = time.time()
 
         running_jobs = server_state.running_jobs
+        job_receipt_id = server_state.job_receipt_id
         job_sender = server_state.job_sender
         job_executable = server_state.job_executable
         job_queue = priorityqueue.JobQueue()
