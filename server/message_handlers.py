@@ -12,8 +12,6 @@ import copy
 import multiprocessing as mp
 import time
 
-import sys
-
 from . import matchmaking
 from ..messaging import message
 from ..messaging import messageutils

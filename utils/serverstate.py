@@ -15,6 +15,8 @@ class ServerState(object):
         job_executable: Dictionary with job executables {job_id: executable}
         state_order: Integer with sequence ordering number of ServerState
             sent to backup server.
+        job_receipt_id: Last used job receipt ID by central server. Required by
+            backup to ensure duplicate jobs are not issued.
     """
 
     def __init__(self, compute_nodes, running_jobs, job_queue, job_executable,
@@ -32,7 +34,8 @@ class ServerState(object):
             {job_id: executable}
         :param state_order: Integer with sequence ordering number of ServerState
             sent to backup server.
-        :param job_receipt_id:
+        :param job_receipt_id: Most recent receipt ID issued to new job by
+            central server.
         """
 
         # Convert from priority queue class JobQueue to a simple list

@@ -43,7 +43,6 @@ class Job:
         :param min_cores: int, min no. of cores required for execution
         :param max_memory: int, max amount of memory (in MB) preferred for
             execution
-
         """
 
         self.submission_id = None
@@ -72,7 +71,6 @@ class Job:
     def get_executable_name(self):
         """ Return name of the executable file, by parsing the address.
         """
-
         executable_address_partitions = self.executable.split('/')
         return '/' + executable_address_partitions[-1]
 
@@ -91,7 +89,8 @@ class Job:
         """
         return (self.receipt_id == other.receipt_id) or (
                 self.submission_id == other.submission_id and
-                self.sender == other.sender and self.sender is not None)
+                self.sender == other.sender and
+                self.sender is not None)
 
     def __lt__(self, other):
         """Job ordering comparison based on job priority.

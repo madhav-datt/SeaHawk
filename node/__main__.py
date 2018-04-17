@@ -1,4 +1,4 @@
-""" Job submission handler, responsible for communication with central server,
+"""Job submission handler, responsible for communication with central server,
     and job submitter.
 
     Messages sent to server by parent:
@@ -54,11 +54,6 @@
         - SUBMITTED_JOB_COMPLETION: Server, on receiving EXECUTED_JOB message
             from a node, checks job's 'completed' attribute, and if True,
             sends SUBMITTED_JOB_COMPLETION to submitting node
-
-    * TODO
-        - Use cpu run times of processes
-        - Add response time, wait time, turnaround time, throughput
-        - Lost ack messages to server -> what happens?
 """
 
 import argparse
@@ -74,66 +69,12 @@ from ctypes import c_bool
 
 from . import message_handlers
 from . import submission_interface
+from ..messaging import message
 from ..messaging import messageutils
-from ..messaging.message import Message
-from ..messaging.network_params import CLIENT_RECV_PORT
-from ..messaging.network_params import CLIENT_SEND_PORT
-from ..messaging.network_params import BUFFER_SIZE
+from ..messaging import network_params
 
-# Size of shared memory array
-JOB_ARRAY_SIZE = 200
-
-
-# Server crash detection is no longer under use
-
-# def detect_server_crash(shared_last_heartbeat_recv_time):
-#     """Run as a child process, periodically checking last heartbeat time.
-#
-#     :param shared_last_heartbeat_recv_time: shared mp.Value, float type
-#     :return: None
-#     """
-#
-#     # When a server crash detected, shared_last_heartbeat_recv_time is
-#     # set to time.time() + reset_time_allowance, to account for reset time.
-#     reset_time_allowance = 5.
-#
-#     # Time to sleep in between checks, adaptive in nature
-#     sleep_time = 5
-#
-#     # sleep_time will be set to (1 + sleep_time_additive)* (remaining timeout)
-#     # should be strictly greater than 0
-#     sleep_time_additive = 0.1
-#
-#     while True:
-#         # Sleep for some time
-#         time.sleep(sleep_time)
-#
-#         # Check with last heartbeat time for timeout
-#         time_since_last_heartbeat = \
-#             time.time() - shared_last_heartbeat_recv_time.value
-#         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
-#             # reset last heartbeat time, with reset time allowance
-#             shared_last_heartbeat_recv_time.value = time.time() + \
-#                                                     reset_time_allowance
-#
-#             # Make and send a crash message to main process which is listening
-#             # on CLIENT_RECV_PORT for incoming messages
-#             # TODO: Check if 'to' needs to be changed to socket.gethostname()
-#             messageutils.make_and_send_message(
-#                 msg_type='SERVER_CRASH',
-#                 content=None,
-#                 file_path=None,
-#                 to='127.0.0.1',
-#                 msg_socket=None,
-#                 port=CLIENT_RECV_PORT)
-#
-#             # Reset sleep time to the time for reset allowance
-#             sleep_time = reset_time_allowance
-#         else:
-#             # sleep time updated adaptively
-#             remaining_timeout = \
-#                 CRASH_ASSUMPTION_TIME - time_since_last_heartbeat
-#             sleep_time = remaining_timeout * (1 + sleep_time_additive)
+JOB_ARRAY_SIZE = 200  # Size of shared memory array
+SERVER_CHANGE_WAIT_TIME = 7
 
 
 # noinspection PyUnusedLocal
@@ -203,12 +144,19 @@ def main():
     # Creating new process for job submission interface
     process_submission_interface = mp.Process(
         target=submission_interface.run_submission_interface,
-        args=(newstdin, shared_job_array, shared_submitted_jobs_array,
-              shared_acknowledged_jobs_array, shared_completed_jobs_array,
-              executed_jobs_receipt_ids, executing_jobs_receipt_ids,
-              executing_jobs_begin_times,
-              submitted_completed_jobs, preempted_jobs_receipt_ids,
-              shared_submission_interface_quit)
+        args=(
+            newstdin,
+            shared_job_array,
+            shared_submitted_jobs_array,
+            shared_acknowledged_jobs_array,
+            shared_completed_jobs_array,
+            executed_jobs_receipt_ids,
+            executing_jobs_receipt_ids,
+            executing_jobs_begin_times,
+            submitted_completed_jobs,
+            preempted_jobs_receipt_ids,
+            shared_submission_interface_quit,
+        )
     )
 
     # Starting job submission interface process
@@ -223,11 +171,12 @@ def main():
     # Start listening to incoming connections on CLIENT_RECV_PORT.
     # Server and child processes connect to this socket
     msg_socket = socket.socket()
-    msg_socket.bind(('', CLIENT_RECV_PORT))
+    msg_socket.bind(('', network_params.CLIENT_RECV_PORT))
     msg_socket.listen(5)
 
     # Send first heartbeat to server
-    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+    messageutils.send_heartbeat(
+        to=server_ip, port=network_params.CLIENT_SEND_PORT)
 
     while True:
         # Accept an incoming connection
@@ -239,25 +188,27 @@ def main():
 
         # Receive the data
         data_list = []
-        data = connection.recv(BUFFER_SIZE)
+        data = connection.recv(network_params.BUFFER_SIZE)
         while data:
             data_list.append(data)
-            data = connection.recv(BUFFER_SIZE)
+            data = connection.recv(network_params.BUFFER_SIZE)
         data = b''.join(data_list)
 
         msg = pickle.loads(data)
-        assert isinstance(msg, Message), "Received object on socket not of" \
-                                         "type Message."
+        assert isinstance(
+            msg, message.Message), "Received object on socket not of type " \
+                                   "Message."
 
         if msg.sender == backup_ip and msg.msg_type == 'I_AM_NEW_SERVER':
             # Primary server crash detected by backup server
             # switch primary and backup server ips
             server_ip, backup_ip = backup_ip, server_ip
-            time.sleep(7)
+            time.sleep(SERVER_CHANGE_WAIT_TIME)
             message_handlers.server_crash_msg_handler(
                 shared_submitted_jobs_array,
                 shared_acknowledged_jobs_array,
-                executed_jobs_receipt_ids, ack_executed_jobs_receipt_ids,
+                executed_jobs_receipt_ids,
+                ack_executed_jobs_receipt_ids,
                 server_ip)
 
         elif msg.sender == backup_ip:
@@ -269,8 +220,10 @@ def main():
             # noinspection PyUnusedLocal
             shared_last_heartbeat_recv_time.value = \
                 message_handlers.heartbeat_msg_handler(
-                    shared_job_array, shared_submitted_jobs_array,
-                    executing_jobs_receipt_ids, executed_jobs_receipt_ids,
+                    shared_job_array,
+                    shared_submitted_jobs_array,
+                    executing_jobs_receipt_ids,
+                    executed_jobs_receipt_ids,
                     executing_jobs_required_times,
                     executing_jobs_begin_times,
                     execution_jobs_pid_dict,
@@ -298,28 +251,38 @@ def main():
                 executing_jobs_required_times=executing_jobs_required_times,
                 executed_jobs_receipt_ids=executed_jobs_receipt_ids,
                 shared_submission_interface_quit=shared_submission_interface_quit,
-                server_ip=server_ip, self_ip=self_ip)
-            messageutils.make_and_send_message(msg_type='ACK_JOB_EXEC',
-                                               content=None, file_path=None,
-                                               to=server_ip, msg_socket=None,
-                                               port=CLIENT_SEND_PORT)
+                server_ip=server_ip,
+                self_ip=self_ip)
+            messageutils.make_and_send_message(
+                msg_type='ACK_JOB_EXEC',
+                content=None,
+                file_path=None,
+                to=server_ip,
+                msg_socket=None,
+                port=network_params.CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
-            print('Job Preemption for job r_id =', msg.content[1], 'received\n'
-                                                                   '\n>>>',
-                  end=' ')
+            print(
+                'Job Preemption for job r_id =', msg.content[1],
+                'received\n\n>>>', end=' ')
             preempted_jobs_receipt_ids[msg.content[1]] = 0
             message_handlers.job_preemption_msg_handler(
-                msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
+                msg=msg,
+                execution_jobs_pid_dict=execution_jobs_pid_dict,
+                executed_jobs_receipt_ids=executed_jobs_receipt_ids,
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
                 executing_jobs_begin_times=executing_jobs_begin_times,
                 executing_jobs_required_times=executing_jobs_required_times,
                 shared_submission_interface_quit=shared_submission_interface_quit,
-                server_ip=server_ip, self_ip=self_ip)
-            messageutils.make_and_send_message(msg_type='ACK_JOB_PREEMPT_EXEC',
-                                               content=None, file_path=None,
-                                               to=server_ip, msg_socket=None,
-                                               port=CLIENT_SEND_PORT)
+                server_ip=server_ip,
+                self_ip=self_ip)
+            messageutils.make_and_send_message(
+                msg_type='ACK_JOB_PREEMPT_EXEC',
+                content=None,
+                file_path=None,
+                to=server_ip,
+                msg_socket=None,
+                port=network_params.CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'EXECUTED_JOB_TO_PARENT':
             message_handlers.executed_job_to_parent_msg_handler(
@@ -334,7 +297,6 @@ def main():
                 msg, shared_completed_jobs_array, submitted_completed_jobs,
                 server_ip)
 
-        # TODO: Can put condition that if address=server_ip, don't close
         connection.close()
 
 

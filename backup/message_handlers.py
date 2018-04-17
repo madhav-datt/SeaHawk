@@ -32,7 +32,6 @@ def heartbeat_handler(received_msg):
     :param received_msg: message, received message.
     :return: ServerState object received from central server.
     """
-
     messageutils.send_heartbeat(to=received_msg.sender, port=CLIENT_SEND_PORT)
 
 

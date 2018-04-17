@@ -33,7 +33,6 @@ def matchmaking(job, compute_nodes, running_jobs):
             candidates.append(node_id)
 
     # Try to assign a node for the job from the probable candidates
-    # if job.receipt_id < 4:  # For testing preemption with single node.
     if len(candidates) > 0:
         # Find the set of idle machines
         idle_machines = []

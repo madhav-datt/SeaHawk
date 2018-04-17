@@ -13,17 +13,20 @@ import time
 import subprocess
 
 from ...messaging import messageutils
-from ...messaging.network_params import CLIENT_RECV_PORT
+from ...messaging import network_params
 
 JOB_PICKLE_FILE = '/job.pickle'
 
 
-def execute_job(current_job, execution_dst, current_job_directory,
-                execution_jobs_pid_dict, executing_jobs_required_times,
+def execute_job(current_job,
+                execution_dst,
+                current_job_directory,
+                execution_jobs_pid_dict,
+                executing_jobs_required_times,
                 executed_jobs_receipt_ids,
                 shared_submission_interface_quit,
-                server_ip, self_ip):
-    """Execute the executable file, and send submission results to server_ip
+                self_ip):
+    """Execute the executable file, and send submission results to self_ip
 
     :param current_job: job object, to be executed
     :param execution_dst: str, path to executable file
@@ -32,8 +35,7 @@ def execute_job(current_job, execution_dst, current_job_directory,
     :param executing_jobs_required_times: manager.dict
     :param executed_jobs_receipt_ids: manager.dict
     :param shared_submission_interface_quit: mp.Value
-    :param server_ip: str, ip address of server
-    :param self_ip: str
+    :param self_ip: str, ip address of current node.
     :return: None
     """
 
@@ -85,11 +87,12 @@ def execute_job(current_job, execution_dst, current_job_directory,
 
         # Prepare and send executed job information message to parent
         executed_jobs_receipt_ids[job_id] = 0
-        messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
-                                           content=current_job,
-                                           file_path=None, to=self_ip,
-                                           msg_socket=None,
-                                           port=CLIENT_RECV_PORT)
+        messageutils.make_and_send_message(
+            msg_type='EXECUTED_JOB_TO_PARENT',
+            content=current_job,
+            file_path=None, to=self_ip,
+            msg_socket=None,
+            port=network_params.CLIENT_RECV_PORT)
         # Gracefully exit
         # noinspection PyProtectedMember
         os._exit(0)
@@ -127,8 +130,9 @@ def execute_job(current_job, execution_dst, current_job_directory,
     # Prepare and send job completion message to parent
     # executed_jobs_receipt_ids[job_id] = 0
     executed_jobs_receipt_ids[job_id] = 0
-    messageutils.make_and_send_message(msg_type='EXECUTED_JOB_TO_PARENT',
-                                       content=current_job,
-                                       file_path=None, to=self_ip,
-                                       msg_socket=None,
-                                       port=CLIENT_RECV_PORT)
+    messageutils.make_and_send_message(
+        msg_type='EXECUTED_JOB_TO_PARENT',
+        content=current_job,
+        file_path=None, to=self_ip,
+        msg_socket=None,
+        port=network_params.CLIENT_RECV_PORT)

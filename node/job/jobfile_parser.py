@@ -3,7 +3,7 @@
 import argparse
 import os
 
-from .job import Job
+from . import job
 
 
 def parse_jobfile(jobfile_name):
@@ -52,10 +52,9 @@ def make_job(jobfile_name):
     :param jobfile_name: str, address of jobfile
     :return: job object
     """
-
     job_description_dict = parse_jobfile(jobfile_name)
-    job = Job(**job_description_dict)
-    return job
+    created_job = job.Job(**job_description_dict)
+    return created_job
 
 
 if __name__ == '__main__':

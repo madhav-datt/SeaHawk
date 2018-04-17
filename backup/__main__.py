@@ -89,7 +89,6 @@ def main():
     backup_ip = args.backup_ip
     server_state = None
 
-
     # Shared variable storing time of last heartbeat receipt, of type float
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
@@ -99,7 +98,6 @@ def main():
         args=(shared_last_heartbeat_recv_time, backup_ip, )
     )
     process_server_crash_detection.daemon = 1
-
     process_server_crash_detection.start()
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.

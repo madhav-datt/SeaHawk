@@ -24,9 +24,8 @@ def make_and_send_message(msg_type, content, file_path, to, msg_socket, port):
     :param msg_socket: socket, via which to send the message
     :param port: int, port number on which message should be received
     """
-
-    msg = message.Message(msg_type=msg_type, content=content,
-                          file_path=file_path)
+    msg = message.Message(
+        msg_type=msg_type, content=content, file_path=file_path)
     send_message(msg=msg, to=to, msg_socket=msg_socket, port=port)
 
 
@@ -39,7 +38,6 @@ def wait_send_heartbeat_to_backup(to, port, server_state):
     :param port: Integer with port to be used for sending/receiving messages.
     :param server_state: ServerState object with state to be sent to backup.
     """
-
     time.sleep(HEARTBEAT_REPLY_WAIT_SECONDS)
     make_and_send_message(
         msg_type='HEARTBEAT',
@@ -58,7 +56,6 @@ def wait_send_heartbeat(to, port):
     :param to: String with IP address of receiver node
     :param port: Integer with port to be used for sending/receiving messages.
     """
-
     time.sleep(HEARTBEAT_REPLY_WAIT_SECONDS)
     send_heartbeat(to=to, port=port)
 
@@ -73,7 +70,6 @@ def send_message(msg, to, msg_socket=None, port=PORT):
     :param port: Integer with port to be used for sending/receiving messages.
         Default is 5005.
     """
-
     if msg_socket is None:
         msg_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -82,6 +78,7 @@ def send_message(msg, to, msg_socket=None, port=PORT):
         except OSError:
             # Raised if endpoint is already connected. No action is needed.
             pass
+
     msg.sender = msg_socket.getsockname()[0]
     msg_data = io.BytesIO(pickle.dumps(msg))
 
@@ -117,11 +114,10 @@ def send_heartbeat(to, msg_socket=None, port=PORT, num_executing_jobs=None):
     :param port: Integer with port to be used for sending/receiving messages.
         Default is 5005.
     """
-
     # 'cpu': Percent CPU available, 'memory': Available memory in MB
     memory = psutil.virtual_memory().available >> 20
     if num_executing_jobs is not None:
-        memory = max(300, memory - num_executing_jobs*300)
+        memory = max(300, memory - num_executing_jobs * 300)
 
     system_resources = {
         'cpu': 100 - psutil.cpu_percent(),
@@ -129,6 +125,10 @@ def send_heartbeat(to, msg_socket=None, port=PORT, num_executing_jobs=None):
     }
 
     # Construct the message with system resources and send to server
-    make_and_send_message(msg_type='HEARTBEAT', content=system_resources,
-                          file_path=None, to=to, msg_socket=msg_socket,
-                          port=port)
+    make_and_send_message(
+        msg_type='HEARTBEAT',
+        content=system_resources,
+        file_path=None,
+        to=to,
+        msg_socket=msg_socket,
+        port=port)

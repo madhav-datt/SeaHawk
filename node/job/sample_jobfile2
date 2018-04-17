@@ -1,4 +1,4 @@
-name: myjob1
+name: myjob2
 executable: /home/avikalp/Desktop/distributed/project/ds-project/node/job/sample_executable2
 priority: 10
 time_required: 35

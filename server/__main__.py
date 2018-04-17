@@ -88,6 +88,15 @@ CRASH_DETECTOR_SLEEP_TIME = 5  # seconds
 SERVER_START_WAIT_TIME = 5  # seconds
 
 BACKUP_SERVER_STATE_PATH = './backup_state.pkl'
+PROMPT_WELCOME_FILENAME = '/prompt_welcome'
+
+
+def print_welcome_message():
+    """Print a welcome message read from prompt_welcome file to stdout."""
+    prompt_welcome_filepath = \
+        os.path.dirname(os.path.realpath(__file__)) + PROMPT_WELCOME_FILENAME
+    with open(prompt_welcome_filepath, 'r') as file:
+        print(file.read())
 
 
 def detect_node_crash(node_last_seen, server_ip):
@@ -126,6 +135,8 @@ def detect_node_crash(node_last_seen, server_ip):
 
 
 def main():
+    """Get server ip, backup ip, listen for messages and manage jobs.
+    """
     parser = argparse.ArgumentParser(description='Set up central server.')
     parser.add_argument(
         '--server-ip',
@@ -138,6 +149,8 @@ def main():
     args = parser.parse_args()
     backup_ip = args.backup_ip
     server_ip = args.server_ip
+
+    print_welcome_message()
 
     compute_nodes = {}  # {node_id: status}
     job_queue = priorityqueue.JobQueue()

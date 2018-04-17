@@ -20,6 +20,8 @@ class Message(object):
                 SUBMITTED_JOB_COMPLETION: Job object for the submitted job.
                 ACK_SUBMITTED_JOB_COMPLETION: Receipt id of submitted job.
                 NODE_CRASH: Set of nodes that have crashed.
+                SERVER_CRASH: None
+                BACKUP_UPDATE: ServerState object with latest state of server.
           sender: String with IP address of sender machine.
           file: Byte string with file contents.
                 Default: None
@@ -33,6 +35,8 @@ class Message(object):
                 SUBMITTED_JOB_COMPLETION: Generated log file
                 ACK_SUBMITTED_JOB_COMPLETION: None
                 NODE_CRASH: None
+                SERVER_CRASH: None
+                BACKUP_UPDATE: None
     """
 
     def __init__(self, msg_type, content=None, file_path=None, file=None):
@@ -46,7 +50,6 @@ class Message(object):
             file: Byte stream of file. If file_path is not None, this will be
                 ignored.
         """
-
         self.msg_type = msg_type
         self.content = content
 
@@ -59,7 +62,6 @@ class Message(object):
     def __str__(self):
         """Custom function to print message details.
 
-        :return: String representation of message.
+        :return: String representation of message information.
         """
-
         return self.msg_type + ' ' + str(self.content)

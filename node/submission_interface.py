@@ -8,6 +8,7 @@
     and display corresponding content, and in case of job submission, prepare
     the files for submission and notify parent process through shared memory.
 """
+
 import sys
 import os
 import pickle
@@ -21,7 +22,8 @@ SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
 PROMPT_WELCOME_FILENAME = '/prompt_welcome'
 
 
-def run_submission_interface(newstdin, shared_job_array,
+def run_submission_interface(newstdin,
+                             shared_job_array,
                              shared_submitted_jobs_array,
                              shared_acknowledged_jobs_array,
                              shared_completed_jobs_array,
@@ -52,7 +54,6 @@ def run_submission_interface(newstdin, shared_job_array,
     :param shared_submission_interface_quit: mp.Value c_bool, whether this child
         process has quit.
     :return: None
-
     """
     sys.stdin = newstdin
     print_welcome_message()
@@ -61,7 +62,7 @@ def run_submission_interface(newstdin, shared_job_array,
     # store job files
     num_created_jobs = 0
     while os.path.isdir(SUBMITTED_JOB_DIRECTORY_PREFIX + str(
-                    num_created_jobs+1)):
+            num_created_jobs + 1)):
         num_created_jobs += 1
 
     # keep looping and accepting jobs
@@ -103,11 +104,15 @@ def run_submission_interface(newstdin, shared_job_array,
 
         elif command_type == 'STATUS':
             # Print status of all received jobs
-            print_status(shared_job_array, shared_submitted_jobs_array,
-                         shared_acknowledged_jobs_array,
-                         shared_completed_jobs_array, executed_jobs_receipt_ids,
-                         executing_jobs_receipt_ids, executing_jobs_begin_times,
-                         submitted_completed_jobs, preempted_jobs_receipt_ids)
+            print_status(
+                shared_job_array, shared_submitted_jobs_array,
+                shared_acknowledged_jobs_array,
+                shared_completed_jobs_array,
+                executed_jobs_receipt_ids,
+                executing_jobs_receipt_ids,
+                executing_jobs_begin_times,
+                submitted_completed_jobs,
+                preempted_jobs_receipt_ids)
 
         elif command_type == 'QUIT':
             shared_submission_interface_quit.value = True
@@ -131,25 +136,29 @@ def print_error_message(command):
     """Print an error message to stdout in case of improper input command.
 
     :param command: str, unknown command entered by user.
-
     """
     print('\n%s: command not found\n'
           'Use "help" to see correct command semantics.' % command)
 
 
 def print_help_message():
-    """Text to display on "help" command."""
+    """Text to display on "help" command.
+    """
     print("\nUse:\n"
           "1)\"submit <path_to_jobfile>\" for job submission\n"
           "2)\"status\" to get status of all submitted jobs\n"
           "3)\"quit\" to exit SeaHawk.")
 
 
-def print_status(shared_job_array, shared_submitted_jobs_array,
-                 shared_acknowledged_jobs_array, shared_completed_jobs_array,
+def print_status(shared_job_array,
+                 shared_submitted_jobs_array,
+                 shared_acknowledged_jobs_array,
+                 shared_completed_jobs_array,
                  executed_jobs_receipt_ids,
-                 executing_jobs_receipt_ids, executing_jobs_begin_times,
-                 submitted_completed_jobs, preempted_jobs_receipt_ids):
+                 executing_jobs_receipt_ids,
+                 executing_jobs_begin_times,
+                 submitted_completed_jobs,
+                 preempted_jobs_receipt_ids):
     """Print the status of all received jobs to terminal.
 
     :param shared_job_array: mp.Array of type bool.
@@ -197,6 +206,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
                      completion_time,
                      response_time
                      ))
+
     if total_received_jobs == 0:
         print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))
     else:
@@ -209,9 +219,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
     current_time = time.time()
     print('%-15s%-15s' % ('JOB ID', 'RUN TIME'))
-    # for id_num in preempted_jobs_receipt_ids.keys():
-    #     total_executing_jobs += 1
-    #     print('%-20s%-15s' % (id_num, 'completed'))
+
     for id_num in executing_jobs_receipt_ids.keys():
         total_executing_jobs += 1
         if id_num in set(executed_jobs_receipt_ids.keys()):
@@ -231,7 +239,6 @@ def command_parser(command):
 
     :param command: str, command input by the user.
     :return: (str, tuple), command type, tuple of accompanying arguments.
-
     """
     command = command.strip()
 
@@ -249,7 +256,7 @@ def command_parser(command):
             return 'IMPROPER COMMAND', ()
         else:
             jobfile_name = command_parts[1]
-            return 'SUBMIT', (jobfile_name, )
+            return 'SUBMIT', (jobfile_name,)
     elif command.startswith("history"):
         command_parts = command.split()
         if len(command_parts) != 2:
