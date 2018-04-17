@@ -149,6 +149,10 @@ def job_submit_handler(job_queue,
     job = received_msg.content
     job.sender = received_msg.sender
 
+    # Response time records
+    if job.receive_time is None:
+        job.receive_time = time.time()
+
     all_running_jobs = set(sum(running_jobs.values(), []))
     if job in all_running_jobs:
         # Executed job was not in running jobs, ie. message is from double
@@ -390,6 +394,10 @@ def schedule_and_send_job(job,
         job_queue.put(job)
         return
 
+    # Response time records
+    if job.first_response is None:
+        job.first_response = time.time()
+
     if preempt_job is not None:
         job_exec_msg = message.Message(
             msg_type='JOB_PREEMPT_EXEC',
@@ -402,4 +410,4 @@ def schedule_and_send_job(job,
     messageutils.send_message(
         msg=job_exec_msg, to=node_for_job, port=SERVER_SEND_PORT)
 
-    print('JOB_EXEC:', job.submission_id, job.receipt_id)
+    print('SENDING JOB_EXEC:', job.submission_id, job.receipt_id)
