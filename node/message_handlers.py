@@ -81,7 +81,9 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
                 executed_jobs_receipt_ids[job_id] = 0
 
     # Send heartbeat back to the server
-    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
+    num_executing_jobs = len(executing_jobs_receipt_ids.keys())
+    messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT,
+                                num_executing_jobs=num_executing_jobs)
 
     return heartbeat_recv_time
 

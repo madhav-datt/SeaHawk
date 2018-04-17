@@ -105,7 +105,7 @@ def send_message(msg, to, msg_socket=None, port=PORT):
         pass
 
 
-def send_heartbeat(to, msg_socket=None, port=PORT):
+def send_heartbeat(to, msg_socket=None, port=PORT, num_executing_jobs=None):
     """Sends heartbeat message with system resource usage information.
 
     Heartbeat message includes current CPU usage percentage and memory available
@@ -119,9 +119,13 @@ def send_heartbeat(to, msg_socket=None, port=PORT):
     """
 
     # 'cpu': Percent CPU available, 'memory': Available memory in MB
+    memory = psutil.virtual_memory().available >> 20
+    if num_executing_jobs is not None:
+        memory = min(300, memory - num_executing_jobs*200)
+
     system_resources = {
         'cpu': 100 - psutil.cpu_percent(),
-        'memory': psutil.virtual_memory().available >> 20,
+        'memory': memory,
     }
 
     # Construct the message with system resources and send to server
