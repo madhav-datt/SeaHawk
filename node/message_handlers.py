@@ -252,6 +252,7 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
     executed_jobs_receipt_ids[msg.content.receipt_id] = 0
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
+    print('Sending executed job r_id=%d' % msg.content.receipt_id)
 
 
 def ack_executed_job_msg_handler(msg, ack_executed_jobs_receipt_ids):
