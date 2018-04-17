@@ -161,9 +161,9 @@ def main():
     parser.add_argument("-serverip", help="IP address of central server",
                         type=str, required=True)
     parser.add_argument("-backupip", help="IP address of backup server",
-                        type=str)
+                        type=str, required=True)
     parser.add_argument("-selfip", help="IP address of self",
-                        type=str)
+                        type=str, required=True)
     args = vars(parser.parse_args())
 
     # Obtain server and backup ip's from the arguments

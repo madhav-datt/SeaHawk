@@ -121,7 +121,7 @@ def send_heartbeat(to, msg_socket=None, port=PORT, num_executing_jobs=None):
     # 'cpu': Percent CPU available, 'memory': Available memory in MB
     memory = psutil.virtual_memory().available >> 20
     if num_executing_jobs is not None:
-        memory = min(300, memory - num_executing_jobs*200)
+        memory = max(300, memory - num_executing_jobs*300)
 
     system_resources = {
         'cpu': 100 - psutil.cpu_percent(),
