@@ -305,6 +305,8 @@ def main():
                                                port=CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
+            print('Job Preemption for job r_id =', msg.content[1], 'received\n'
+                                                                   '\n>>> ')
             preempted_jobs_receipt_ids[msg.content[1]] = 0
             message_handlers.job_preemption_msg_handler(
                 msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
