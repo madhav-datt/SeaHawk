@@ -165,6 +165,7 @@ def main():
             node_last_seen[node_id] = time.time()
 
         running_jobs = server_state.running_jobs
+        job_receipt_id = server_state.job_receipt_id
         job_sender = server_state.job_sender
         job_executable = server_state.job_executable
         job_queue = priorityqueue.JobQueue()
@@ -229,6 +230,7 @@ def main():
                                 job_queue=job_queue,
                                 job_sender=job_sender,
                                 job_executable=job_executable,
+                                job_receipt_id=job_receipt_id,
                                 backup_ip=backup_ip,
                                 server_state_order=server_state_order,
                                 received_msg=msg)
@@ -255,6 +257,7 @@ def main():
                         job_queue = message_handlers.executed_job_handler(
                             job_queue=job_queue,
                             compute_nodes=compute_nodes,
+                            job_receipt_id=job_receipt_id,
                             running_jobs=running_jobs,
                             job_sender=job_sender,
                             job_executable=job_executable,
