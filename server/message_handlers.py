@@ -41,7 +41,7 @@ def heartbeat_from_backup_handler(received_msg):
 
 def heartbeat_handler(compute_nodes, node_last_seen, running_jobs, job_queue,
                       job_executable, job_sender, server_state_order, backup_ip,
-                      received_msg):
+                      received_msg, job_receipt_id):
     """Handler function for HEARTBEAT messages from compute nodes.
 
     :param compute_nodes: Dictionary with cpu usage and memory of each node
@@ -57,6 +57,7 @@ def heartbeat_handler(compute_nodes, node_last_seen, running_jobs, job_queue,
     :param server_state_order: Integer with sequence ordering number of
         ServerState sent to backup server.
     :param received_msg: message, received message.
+    :param job_receipt_id:
     """
 
     # Node has recovered and needs to be added back to node data structures
@@ -100,6 +101,7 @@ def heartbeat_handler(compute_nodes, node_last_seen, running_jobs, job_queue,
         job_queue=copy_job_queue,
         job_executable=job_executable,
         job_sender=job_sender,
+        job_receipt_id=job_receipt_id,
         state_order=server_state_order)
 
     messageutils.make_and_send_message(
@@ -178,6 +180,7 @@ def job_submit_handler(job_queue,
         running_jobs=running_jobs,
         job_queue=copy_job_queue,
         job_executable=job_executable,
+        job_receipt_id=job_receipt_id,
         job_sender=job_sender,
         state_order=server_state_order)
 
@@ -205,6 +208,7 @@ def executed_job_handler(job_queue,
                          job_executable,
                          server_state_order,
                          backup_ip,
+                         job_receipt_id,
                          received_msg):
     """Handler function for EXECUTED_JOB messages.
 
@@ -223,6 +227,7 @@ def executed_job_handler(job_queue,
     :param backup_ip: String with IP address of backup server.
     :param received_msg: message, received message.
     :returns job_queue: Priority queue for jobs that have not been scheduled.
+    :param job_receipt_id:
     """
 
     executed_job = received_msg.content
@@ -286,6 +291,7 @@ def executed_job_handler(job_queue,
         job_queue=copy_job_queue,
         job_executable=job_executable,
         job_sender=job_sender,
+        job_receipt_id=job_receipt_id,
         state_order=server_state_order)
 
     messageutils.make_and_send_message(
