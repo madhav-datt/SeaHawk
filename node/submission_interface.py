@@ -185,8 +185,8 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
                 completion_time = 'None'
             try:
                 response_time = \
-                    submitted_completed_jobs[id_num].receive_time - \
-                    submitted_completed_jobs[id_num].first_response
+                    submitted_completed_jobs[id_num].first_response - \
+                    submitted_completed_jobs[id_num].receive_time
             except KeyError:
                 response_time = 'None'
             print('%-10s%-15s%-15s%-15s%-20s%-20s'

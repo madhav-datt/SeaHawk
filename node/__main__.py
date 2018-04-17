@@ -218,7 +218,7 @@ def main():
     shared_last_heartbeat_recv_time = mp.Value('d', time.time())
 
     # Mask SIGINT for cleanup with killing all child processes
-    signal.signal(signal.SIGINT, sigint_handler)
+    # signal.signal(signal.SIGINT, sigint_handler)
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
     # Server and child processes connect to this socket
