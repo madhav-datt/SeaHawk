@@ -116,6 +116,7 @@ def detect_node_crash(node_last_seen, server_ip):
         # on SERVER_RECV_PORT for incoming messages.
         if len(crashed_nodes) != 0:
             print('NODE CRASHED')
+            print(crashed_nodes)
             messageutils.make_and_send_message(msg_type='NODE_CRASH',
                                                content=crashed_nodes,
                                                file_path=None,
@@ -160,6 +161,9 @@ def main():
             server_state = pickle.load(backup_server_state)
 
         compute_nodes = server_state.compute_nodes
+        for node_id, _ in compute_nodes.items():
+            node_last_seen[node_id] = time.time()
+
         running_jobs = server_state.running_jobs
         job_sender = server_state.job_sender
         job_executable = server_state.job_executable

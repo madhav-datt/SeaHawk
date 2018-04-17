@@ -61,7 +61,7 @@ def detect_server_crash(server_last_seen_time, backup_ip):
         current_time = time.time()
         time_since_last_heartbeat = current_time - server_last_seen_time.value
         if time_since_last_heartbeat > CRASH_ASSUMPTION_TIME:
-            print('NODE CRASHED')
+            print('NODE CRASHED BACKUP')
 
             # Make and send a crash message to main process which is listening
             # on SERVER_RECV_PORT for incoming messages.
@@ -99,6 +99,7 @@ def main():
         args=(shared_last_heartbeat_recv_time, backup_ip, )
     )
     process_server_crash_detection.daemon = 1
+
     process_server_crash_detection.start()
 
     # Start listening to incoming connections on CLIENT_RECV_PORT.
@@ -140,7 +141,9 @@ def main():
             message_handlers.server_crash_handler(
                 server_state=server_state,
                 crashed_server_ip=server_ip,
-                backup_ip=backup_ip)
+                backup_ip=backup_ip,
+                child_pid=process_server_crash_detection.pid,
+                socket_to_close=msg_socket)
 
 
 if __name__ == '__main__':
