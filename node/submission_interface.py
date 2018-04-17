@@ -169,9 +169,10 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
     print('\nStatus of your jobs')
     print('-' * 20)
-    print('%-10s%-15s%-15s%-15s%-20s' % ('JOB ID', 'SUBMITTED',
-                                         'ACKNOWLEDGED', 'COMPLETED',
-                                         'COMPLETION TIME'))
+    print('%-10s%-15s%-15s%-15s%-20s%-20s' % ('JOB ID', 'SUBMITTED',
+                                              'ACKNOWLEDGED', 'COMPLETED',
+                                              'COMPLETION TIME',
+                                              'RESPONSE_TIME'))
 
     for id_num in range(len(shared_job_array)):
         if shared_job_array[id_num]:
@@ -182,12 +183,19 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
                           submission_completion_time)
             except KeyError:
                 completion_time = 'None'
-            print('%-10s%-15s%-15s%-15s%-20s'
+            try:
+                response_time = \
+                    submitted_completed_jobs[id_num].receive_time - \
+                    submitted_completed_jobs[id_num].first_response
+            except KeyError:
+                response_time = 'None'
+            print('%-10s%-15s%-15s%-15s%-20s%-20s'
                   % (id_num,
                      yn_map(shared_submitted_jobs_array[id_num]),
                      yn_map(shared_acknowledged_jobs_array[id_num]),
                      yn_map(shared_completed_jobs_array[id_num]),
-                     completion_time
+                     completion_time,
+                     response_time
                      ))
     if total_received_jobs == 0:
         print('%-10s%-15s%-15s%-15s' % ('None', '-', '-', '-'))

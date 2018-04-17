@@ -65,6 +65,8 @@ class Job:
         self.completed = False
         self.execution_list = []
         self.submit_time = None
+        self.first_response = None
+        self.receive_time = None
         self.submission_completion_time = None
 
     def get_executable_name(self):
