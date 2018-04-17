@@ -29,6 +29,7 @@ def run_submission_interface(newstdin, shared_job_array,
                              executing_jobs_receipt_ids,
                              executing_jobs_begin_times,
                              submitted_completed_jobs,
+                             preempted_jobs_receipt_ids,
                              shared_submission_interface_quit):
     """Handle job submission interface.
 
@@ -47,6 +48,7 @@ def run_submission_interface(newstdin, shared_job_array,
     :param executing_jobs_receipt_ids: set
     :param executing_jobs_begin_times: dict, receipt id:approx begin time
     :param submitted_completed_jobs: dict
+    :param preempted_jobs_receipt_ids: dict
     :param shared_submission_interface_quit: mp.Value c_bool, whether this child
         process has quit.
     :return: None
@@ -105,7 +107,7 @@ def run_submission_interface(newstdin, shared_job_array,
                          shared_acknowledged_jobs_array,
                          shared_completed_jobs_array, executed_jobs_receipt_ids,
                          executing_jobs_receipt_ids, executing_jobs_begin_times,
-                         submitted_completed_jobs)
+                         submitted_completed_jobs, preempted_jobs_receipt_ids)
 
         elif command_type == 'QUIT':
             shared_submission_interface_quit.value = True
@@ -147,7 +149,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
                  shared_acknowledged_jobs_array, shared_completed_jobs_array,
                  executed_jobs_receipt_ids,
                  executing_jobs_receipt_ids, executing_jobs_begin_times,
-                 submitted_completed_jobs):
+                 submitted_completed_jobs, preempted_jobs_receipt_ids):
     """Print the status of all received jobs to terminal.
 
     :param shared_job_array: mp.Array of type bool.
@@ -158,6 +160,7 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
     :param executing_jobs_receipt_ids: set
     :param executing_jobs_begin_times: dict, receipt id:approx begin time
     :param submitted_completed_jobs: dict
+    :param preempted_jobs_receipt_ids: dict
     """
     total_received_jobs = 0
 
@@ -198,9 +201,13 @@ def print_status(shared_job_array, shared_submitted_jobs_array,
 
     current_time = time.time()
     print('%-15s%-15s' % ('JOB ID', 'RUN TIME'))
+    for id_num in preempted_jobs_receipt_ids.keys():
+        total_executing_jobs += 1
+        print('%-20s%-15s' % (id_num, 'completed'))
     for id_num in executing_jobs_receipt_ids.keys():
         total_executing_jobs += 1
-        if id_num in set(executed_jobs_receipt_ids.keys()):
+        if id_num in set(executed_jobs_receipt_ids.keys()) - \
+                set(preempted_jobs_receipt_ids.keys()):
             print('%-20s%-15s' % (id_num, 'completed'))
         else:
             exec_time = round(current_time - executing_jobs_begin_times[id_num])

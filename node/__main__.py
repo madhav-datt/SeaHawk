@@ -162,11 +162,14 @@ def main():
                         type=str, required=True)
     parser.add_argument("-backupip", help="IP address of backup server",
                         type=str)
+    parser.add_argument("-selfip", help="IP address of self",
+                        type=str)
     args = vars(parser.parse_args())
 
     # Obtain server and backup ip's from the arguments
     server_ip = args['serverip']
     backup_ip = args['backupip']
+    self_ip = args['selfip']
 
     # New stdin descriptor for child process
     newstdin = os.fdopen(os.dup(sys.stdin.fileno()))
@@ -181,6 +184,7 @@ def main():
     manager = mp.Manager()
     # Set-Dict to store all executed and acknowledged executed jobs' receipt ids
     executed_jobs_receipt_ids = manager.dict()
+    preempted_jobs_receipt_ids = manager.dict()
     ack_executed_jobs_receipt_ids = manager.dict()
     # Set-Dict to store receipt id of executing jobs
     executing_jobs_receipt_ids = manager.dict()
@@ -203,7 +207,7 @@ def main():
               shared_acknowledged_jobs_array, shared_completed_jobs_array,
               executed_jobs_receipt_ids, executing_jobs_receipt_ids,
               executing_jobs_begin_times,
-              submitted_completed_jobs,
+              submitted_completed_jobs, preempted_jobs_receipt_ids,
               shared_submission_interface_quit)
     )
 
@@ -245,18 +249,18 @@ def main():
         assert isinstance(msg, Message), "Received object on socket not of" \
                                          "type Message."
 
-        if msg.sender != server_ip and msg.msg_type == 'I_AM_NEW_SERVER':
+        if msg.sender == backup_ip and msg.msg_type == 'I_AM_NEW_SERVER':
             # Primary server crash detected by backup server
             # switch primary and backup server ips
-            time.sleep(5)
             server_ip, backup_ip = backup_ip, server_ip
+            time.sleep(7)
             message_handlers.server_crash_msg_handler(
                 shared_submitted_jobs_array,
                 shared_acknowledged_jobs_array,
                 executed_jobs_receipt_ids, ack_executed_jobs_receipt_ids,
                 server_ip)
 
-        elif msg.sender != server_ip:
+        elif msg.sender == backup_ip:
             # Old message from a server detected to have crashed, ignore
             continue
 
@@ -293,20 +297,21 @@ def main():
                 executing_jobs_required_times=executing_jobs_required_times,
                 executed_jobs_receipt_ids=executed_jobs_receipt_ids,
                 shared_submission_interface_quit=shared_submission_interface_quit,
-                server_ip=server_ip)
+                server_ip=server_ip, self_ip=self_ip)
             messageutils.make_and_send_message(msg_type='ACK_JOB_EXEC',
                                                content=None, file_path=None,
                                                to=server_ip, msg_socket=None,
                                                port=CLIENT_SEND_PORT)
 
         elif msg.msg_type == 'JOB_PREEMPT_EXEC':
+            preempted_jobs_receipt_ids[msg.content[1]] = 0
             message_handlers.job_preemption_msg_handler(
                 msg, execution_jobs_pid_dict, executed_jobs_receipt_ids,
                 executing_jobs_receipt_ids=executing_jobs_receipt_ids,
                 executing_jobs_begin_times=executing_jobs_begin_times,
                 executing_jobs_required_times=executing_jobs_required_times,
                 shared_submission_interface_quit=shared_submission_interface_quit,
-                server_ip=server_ip)
+                server_ip=server_ip, self_ip=self_ip)
             messageutils.make_and_send_message(msg_type='ACK_JOB_PREEMPT_EXEC',
                                                content=None, file_path=None,
                                                to=server_ip, msg_socket=None,

@@ -15,13 +15,11 @@ import errno
 import os
 import pickle
 import signal
-import psutil
 import time
 
 from .job import job_execution
 from ..messaging import messageutils
 from ..messaging.network_params import CLIENT_SEND_PORT
-from ..messaging.network_params import CRASH_ASSUMPTION_TIME
 
 SUBMITTED_JOB_DIRECTORY_PREFIX = './submit_job'
 EXECUTING_JOB_DIRECTORY_PREFIX = './exec_job'
@@ -43,6 +41,7 @@ def heartbeat_msg_handler(shared_job_array, shared_submitted_jobs_array,
     :param executed_jobs_receipt_ids: set, receipt ids of all executed jobs
     :param executing_jobs_receipt_ids: set, receipt ids of all executed/ing jobs
     :param executing_jobs_required_times: dict, receipt id:required time
+    :param executing_jobs_begin_times: dict
     :param execution_jobs_pid_dict: dict, receipt id: executing child pid
     :param server_ip: str, ip address of server
     :return: float, heartbeat receive time
@@ -102,7 +101,7 @@ def job_exec_msg_handler(current_job, job_executable,
                          executing_jobs_required_times,
                          executed_jobs_receipt_ids,
                          shared_submission_interface_quit,
-                         server_ip):
+                         server_ip, self_ip):
     """Fork a process to execute the job
 
     :param current_job: job, to be executed
@@ -114,6 +113,7 @@ def job_exec_msg_handler(current_job, job_executable,
     :param executed_jobs_receipt_ids: manager.dict
     :param shared_submission_interface_quit: shared mp.Value
     :param server_ip: str, ip address of server
+    :param self_ip: str
     :return: None
     """
     try:
@@ -156,7 +156,7 @@ def job_exec_msg_handler(current_job, job_executable,
             execution_jobs_pid_dict, executing_jobs_required_times,
             executed_jobs_receipt_ids=executed_jobs_receipt_ids,
             shared_submission_interface_quit=shared_submission_interface_quit,
-            server_ip=server_ip)
+            server_ip=server_ip, self_ip=self_ip)
     else:
         # Parent process
         # os.waitpid(child_pid, 0)
@@ -172,7 +172,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
                                executing_jobs_begin_times,
                                executing_jobs_required_times,
                                shared_submission_interface_quit,
-                               server_ip):
+                               server_ip, self_ip):
     """Handle receive of job preemption message
 
     :param msg: message, received message
@@ -184,6 +184,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
     :param executing_jobs_required_times: dict, receipt id:job required time
     :param shared_submission_interface_quit: Mp.value
     :param server_ip: str, id address of server
+    :param self_ip: str
     :return: None
     """
     new_job, job_receipt_id = msg.content
@@ -227,7 +228,7 @@ def job_preemption_msg_handler(msg, execution_jobs_pid_dict,
         executing_jobs_required_times=executing_jobs_required_times,
         executed_jobs_receipt_ids=executed_jobs_receipt_ids,
         shared_submission_interface_quit=shared_submission_interface_quit,
-        server_ip=server_ip)
+        server_ip=server_ip, self_ip=self_ip)
 
 
 def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
@@ -241,6 +242,7 @@ def executed_job_to_parent_msg_handler(msg, executed_jobs_receipt_ids,
         done executing
     :param server_ip: str, ip address of server
     """
+    msg.msg_type = 'EXECUTED_JOB'
     executed_jobs_receipt_ids[msg.content.receipt_id] = 0
     messageutils.send_message(
         msg=msg, to=server_ip, msg_socket=None, port=CLIENT_SEND_PORT)
@@ -314,8 +316,7 @@ def server_crash_msg_handler(shared_submitted_jobs_array,
     """
     # send first heartbeat to new primary server
     messageutils.send_heartbeat(to=server_ip, port=CLIENT_SEND_PORT)
-    time.sleep(CRASH_ASSUMPTION_TIME)
-
+    # time.sleep(CRASH_ASSUMPTION_TIME)
     # Replay all non-ack messages
     replay_non_ack_msgs(shared_submitted_jobs_array,
                         shared_acknowledged_jobs_array,
@@ -324,7 +325,6 @@ def server_crash_msg_handler(shared_submitted_jobs_array,
 
 
 # Helper Functions
-
 def submit_job(job_id, server_ip):
     """Helper function to heartbeat_msg_handler, submit job to server
 
